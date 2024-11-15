@@ -17,6 +17,7 @@ public:
     ~SocketClient();
 
     bool connect(const string& serverIP, int port);
+    bool disconnect();
     int sendData(const char* data, int dataSize);
     int receiveData(char* buffer, int bufferSize);
     void sendCommand(const string& command);
@@ -24,4 +25,6 @@ public:
     void receiveAndSaveImage(const string& filename);
     void cleanup();
     bool isConnected() const;
+
+    bool connected;
 };

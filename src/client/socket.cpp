@@ -1,4 +1,4 @@
-#include "socket.h"
+﻿#include "socket.h"
 #include <iostream>
 #include <fstream>
 
@@ -47,6 +47,20 @@ bool SocketClient::connect(const string& serverIP, int port) {
         return false;
     }
 
+    return true;
+}
+
+bool SocketClient::disconnect() {
+    if (!connected) {
+        return true;  // Đã disconnect rồi
+    }
+
+    if (closesocket(clientSocket) == SOCKET_ERROR) {
+        return false;
+    }
+
+    connected = false;
+    clientSocket = INVALID_SOCKET;
     return true;
 }
 

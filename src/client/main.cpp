@@ -1,4 +1,4 @@
-#include <wx/wx.h>
+﻿#include <wx/wx.h>
 #include "GUI.h"
 #include <iostream>
 #include <sstream>

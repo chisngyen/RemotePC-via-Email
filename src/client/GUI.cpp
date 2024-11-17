@@ -30,73 +30,127 @@ MainFrame::MainFrame(const wxString& title)
     isMonitoring = false;
     checkEmailTimer = new wxTimer(this, ID_CHECK_EMAIL_TIMER);
 
-    // Create main panel
+    // Create main panel with dark theme background (Rich dark blue-gray)
     wxPanel* panel = new wxPanel(this);
+    panel->SetBackgroundColour(wxColour(30, 33, 41));
+
+    // Set default font for better readability on dark background
+    wxFont defaultFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
+    panel->SetFont(defaultFont);
+
     wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
 
     // Connection section
-    wxStaticBoxSizer* connectionSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Server Connection");
+    wxStaticBoxSizer* connectionSizer = new wxStaticBoxSizer(wxHORIZONTAL, panel, "Server Connection");
+    wxStaticBox* connBox = connectionSizer->GetStaticBox();
+    connBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    connBox->SetBackgroundColour(wxColour(37, 41, 51));
 
-    wxBoxSizer* ipSizer = new wxBoxSizer(wxHORIZONTAL);
-    ipSizer->Add(new wxStaticText(panel, wxID_ANY, "IP Address:"), 0, wxALL, 5);
-    txtIpAddress = new wxTextCtrl(panel, wxID_ANY);
-    ipSizer->Add(txtIpAddress, 1, wxALL, 5);
+    wxBoxSizer* ipPortSizer = new wxBoxSizer(wxHORIZONTAL);
+    wxStaticText* ipLabel = new wxStaticText(panel, wxID_ANY, "IP Address:");
+    ipLabel->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho label
+    txtIpAddress = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(150, -1));
+    txtIpAddress->SetBackgroundColour(wxColour(45, 48, 58));
+    txtIpAddress->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho text input
 
-    wxBoxSizer* portSizer = new wxBoxSizer(wxHORIZONTAL);
-    portSizer->Add(new wxStaticText(panel, wxID_ANY, "Port:"), 0, wxALL, 5);
-    txtPort = new wxTextCtrl(panel, wxID_ANY);
-    portSizer->Add(txtPort, 1, wxALL, 5);
+    wxStaticText* portLabel = new wxStaticText(panel, wxID_ANY, "Port:");
+    portLabel->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho label
+    txtPort = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1));
+    txtPort->SetBackgroundColour(wxColour(45, 48, 58));
+    txtPort->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho text input
+
+    ipPortSizer->Add(ipLabel, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+    ipPortSizer->Add(txtIpAddress, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 20);
+    ipPortSizer->Add(portLabel, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+    ipPortSizer->Add(txtPort, 0, wxALIGN_CENTER_VERTICAL);
 
     wxBoxSizer* connectionButtonSizer = new wxBoxSizer(wxHORIZONTAL);
-    btnConnect = new wxButton(panel, ID_CONNECT, "Connect");
-    wxButton* btnDisconnect = new wxButton(panel, ID_DISCONNECT, "Disconnect");
+
+    // Create modern-looking connect button (Accent color: Teal)
+    btnConnect = new wxButton(panel, ID_CONNECT, "Connect", wxDefaultPosition, wxSize(100, 30));
+    btnConnect->SetBackgroundColour(wxColour(0, 150, 136));
+    btnConnect->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
+
+    wxButton* btnDisconnect = new wxButton(panel, ID_DISCONNECT, "Disconnect", wxDefaultPosition, wxSize(100, 30));
+    btnDisconnect->SetBackgroundColour(wxColour(239, 83, 80));
+    btnDisconnect->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
     btnDisconnect->Disable();
+
     lblConnectionStatus = new wxStaticText(panel, wxID_ANY, "Status: OFF");
+    lblConnectionStatus->SetForegroundColour(wxColour(255, 99, 71));  // Tomato red cho status offline
 
     connectionButtonSizer->Add(btnConnect, 0, wxALL, 5);
     connectionButtonSizer->Add(btnDisconnect, 0, wxALL, 5);
-    connectionButtonSizer->Add(lblConnectionStatus, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+    connectionButtonSizer->Add(lblConnectionStatus, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, 20);
 
-    connectionSizer->Add(ipSizer, 0, wxEXPAND);
-    connectionSizer->Add(portSizer, 0, wxEXPAND);
-    connectionSizer->Add(connectionButtonSizer, 0, wxEXPAND);
+    connectionSizer->Add(ipPortSizer, 0, wxEXPAND | wxALL, 10);
+    connectionSizer->Add(connectionButtonSizer, 1, wxEXPAND | wxALL, 10);
 
     // Authentication section
     wxStaticBoxSizer* authSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Gmail Authentication");
+    wxStaticBox* authBox = authSizer->GetStaticBox();
+    authBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    authBox->SetBackgroundColour(wxColour(37, 41, 51));
 
     wxBoxSizer* authButtonSizer = new wxBoxSizer(wxHORIZONTAL);
-    btnAuthenticate = new wxButton(panel, ID_AUTHENTICATE, "Start Authentication");
-    btnSubmitAuth = new wxButton(panel, ID_SUBMIT_AUTH, "Submit Auth Code");
+
+    btnAuthenticate = new wxButton(panel, ID_AUTHENTICATE, "Start Authentication", wxDefaultPosition, wxSize(-1, 30));
+    btnAuthenticate->SetBackgroundColour(wxColour(63, 81, 181));
+    btnAuthenticate->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
+
+    btnSubmitAuth = new wxButton(panel, ID_SUBMIT_AUTH, "Submit Auth Code", wxDefaultPosition, wxSize(-1, 30));
+    btnSubmitAuth->SetBackgroundColour(wxColour(63, 81, 181));
+    btnSubmitAuth->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
     btnSubmitAuth->Disable();
 
-    authButtonSizer->Add(btnAuthenticate, 0, wxALL, 5);
-    authButtonSizer->Add(btnSubmitAuth, 0, wxALL, 5);
+    authButtonSizer->Add(btnAuthenticate, 1, wxALL, 5);
+    authButtonSizer->Add(btnSubmitAuth, 1, wxALL, 5);
 
     txtAuthCode = new wxTextCtrl(panel, wxID_ANY);
+    txtAuthCode->SetBackgroundColour(wxColour(45, 48, 58));
+    txtAuthCode->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho text input
     txtAuthCode->SetHint("Enter authentication code here");
 
-    authSizer->Add(authButtonSizer, 0, wxEXPAND);
+    authSizer->Add(authButtonSizer, 0, wxEXPAND | wxALL, 5);
     authSizer->Add(txtAuthCode, 0, wxALL | wxEXPAND, 5);
 
     // Monitoring section
     wxStaticBoxSizer* monitoringSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Email Monitoring");
-    btnStartMonitoring = new wxButton(panel, ID_START_MONITORING, "Start Monitoring");
+    wxStaticBox* monitorBox = monitoringSizer->GetStaticBox();
+    monitorBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    monitorBox->SetBackgroundColour(wxColour(37, 41, 51));
+
+    btnStartMonitoring = new wxButton(panel, ID_START_MONITORING, "Start Monitoring", wxDefaultPosition, wxSize(-1, 30));
+    btnStartMonitoring->SetBackgroundColour(wxColour(0, 150, 136));
+    btnStartMonitoring->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
     btnStartMonitoring->Disable();
     monitoringSizer->Add(btnStartMonitoring, 0, wxALL | wxEXPAND, 5);
 
-    // Create a horizontal sizer for status and commands
+    // Status and Commands sections
     wxBoxSizer* bottomSizer = new wxBoxSizer(wxHORIZONTAL);
 
     // Status section
     wxStaticBoxSizer* statusSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Status");
+    wxStaticBox* statusBox = statusSizer->GetStaticBox();
+    statusBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    statusBox->SetBackgroundColour(wxColour(37, 41, 51));
+
     txtStatus = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(-1, 150),
         wxTE_MULTILINE | wxTE_READONLY);
+    txtStatus->SetBackgroundColour(wxColour(45, 48, 58));
+    txtStatus->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho text area
     statusSizer->Add(txtStatus, 1, wxALL | wxEXPAND, 5);
 
     // Commands section
     wxStaticBoxSizer* commandsSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Received Commands");
+    wxStaticBox* commandsBox = commandsSizer->GetStaticBox();
+    commandsBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    commandsBox->SetBackgroundColour(wxColour(37, 41, 51));
+
     txtCommands = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(-1, 150),
         wxTE_MULTILINE | wxTE_READONLY);
+    txtCommands->SetBackgroundColour(wxColour(45, 48, 58));
+    txtCommands->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho text area
     commandsSizer->Add(txtCommands, 1, wxALL | wxEXPAND, 5);
 
     bottomSizer->Add(statusSizer, 1, wxEXPAND | wxRIGHT, 5);
@@ -104,37 +158,47 @@ MainFrame::MainFrame(const wxString& title)
 
     // Direct Command buttons
     wxStaticBoxSizer* directCommandsSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Direct Commands");
-    wxFlexGridSizer* buttonGrid = new wxFlexGridSizer(3, 2, 5, 5);
+    wxStaticBox* directBox = directCommandsSizer->GetStaticBox();
+    directBox->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho tiêu đề
+    directBox->SetBackgroundColour(wxColour(37, 41, 51));
 
-    wxButton* btnListApp = new wxButton(panel, ID_LIST_APP, "List Applications");
-    wxButton* btnListProcess = new wxButton(panel, ID_LIST_PROCESS, "List Processes");
-    wxButton* btnListService = new wxButton(panel, ID_LIST_SERVICE, "List Services");
-    wxButton* btnScreenshot = new wxButton(panel, ID_SCREENSHOT, "Take Screenshot");
-    wxButton* btnOpenCam = new wxButton(panel, ID_OPEN_CAM, "Open Camera");
-    wxButton* btnHelp = new wxButton(panel, ID_HELP, "Help");
+    wxFlexGridSizer* buttonGrid = new wxFlexGridSizer(3, 2, 8, 8);
 
-    buttonGrid->Add(btnListApp, 0, wxEXPAND);
-    buttonGrid->Add(btnListProcess, 0, wxEXPAND);
-    buttonGrid->Add(btnListService, 0, wxEXPAND);
-    buttonGrid->Add(btnScreenshot, 0, wxEXPAND);
-    buttonGrid->Add(btnOpenCam, 0, wxEXPAND);
-    buttonGrid->Add(btnHelp, 0, wxEXPAND);
+    // Function to create styled command buttons
+    auto createCommandButton = [&](const wxString& label, wxWindowID id) {
+        wxButton* btn = new wxButton(panel, id, label, wxDefaultPosition, wxSize(-1, 30));
+        btn->SetBackgroundColour(wxColour(96, 125, 139));
+        btn->SetForegroundColour(wxColour(255, 255, 255));  // Trắng cho button text
+        return btn;
+        };
 
-    directCommandsSizer->Add(buttonGrid, 0, wxALL | wxEXPAND, 5);
+    wxButton* btnListApp = createCommandButton("List Applications", ID_LIST_APP);
+    wxButton* btnListProcess = createCommandButton("List Processes", ID_LIST_PROCESS);
+    wxButton* btnListService = createCommandButton("List Services", ID_LIST_SERVICE);
+    wxButton* btnScreenshot = createCommandButton("Take Screenshot", ID_SCREENSHOT);
+    wxButton* btnOpenCam = createCommandButton("Open Camera", ID_OPEN_CAM);
+    wxButton* btnHelp = createCommandButton("Help", ID_HELP);
 
-    // Add all sections to main sizer
-    mainSizer->Add(connectionSizer, 0, wxALL | wxEXPAND, 5);
-    mainSizer->Add(authSizer, 0, wxALL | wxEXPAND, 5);
-    mainSizer->Add(monitoringSizer, 0, wxALL | wxEXPAND, 5);
-    mainSizer->Add(directCommandsSizer, 0, wxALL | wxEXPAND, 5);
-    mainSizer->Add(bottomSizer, 1, wxALL | wxEXPAND, 5);
+    buttonGrid->Add(btnListApp, 1, wxEXPAND);
+    buttonGrid->Add(btnListProcess, 1, wxEXPAND);
+    buttonGrid->Add(btnListService, 1, wxEXPAND);
+    buttonGrid->Add(btnScreenshot, 1, wxEXPAND);
+    buttonGrid->Add(btnOpenCam, 1, wxEXPAND);
+    buttonGrid->Add(btnHelp, 1, wxEXPAND);
+
+    directCommandsSizer->Add(buttonGrid, 0, wxALL | wxEXPAND, 10);
+
+    mainSizer->Add(connectionSizer, 0, wxALL | wxEXPAND, 10);
+    mainSizer->Add(authSizer, 0, wxALL | wxEXPAND, 10);
+    mainSizer->Add(monitoringSizer, 0, wxALL | wxEXPAND, 10);
+    mainSizer->Add(directCommandsSizer, 0, wxALL | wxEXPAND, 10);
+    mainSizer->Add(bottomSizer, 1, wxALL | wxEXPAND, 10);
 
     panel->SetSizer(mainSizer);
 
     // Load client secrets
     LoadClientSecrets();
 }
-
 MainFrame::~MainFrame() {
     delete socketClient;
     delete oauth;
@@ -142,24 +206,65 @@ MainFrame::~MainFrame() {
     delete checkEmailTimer;
 }
 
-void MainFrame::UpdateConnectionStatus() {
-    if (socketClient->isConnected()) {
-        lblConnectionStatus->SetLabel("Status: ON");
-        btnConnect->Disable();
-        wxWindow* btnDisconnect = FindWindow(ID_DISCONNECT);
-        if (btnDisconnect) btnDisconnect->Enable();
-    }
-    else {
-        lblConnectionStatus->SetLabel("Status: OFF");
-        btnConnect->Enable();
-        wxWindow* btnDisconnect = FindWindow(ID_DISCONNECT);
-        if (btnDisconnect) btnDisconnect->Disable();
-    }
-}
-
 void MainFrame::UpdateCommandsList(const std::string& command) {
     wxDateTime now = wxDateTime::Now();
     txtCommands->AppendText(now.FormatTime() + ": " + command + "\n");
+}
+
+void MainFrame::ResetApplicationState() {
+    // Reset all input fields
+    txtIpAddress->SetValue("");
+    txtPort->SetValue("");
+    if (txtAuthCode) {
+        txtAuthCode->SetValue("");
+    }
+
+    UpdateConnectionStatus();
+
+    // Reset all buttons to initial state
+    btnConnect->Enable();
+    btnAuthenticate->Disable();
+    btnStartMonitoring->Disable();
+    if (btnSubmitAuth) {
+        btnSubmitAuth->Disable();
+    }
+
+    wxWindow* btnDisconnect = FindWindow(ID_DISCONNECT);
+    if (btnDisconnect) btnDisconnect->Disable();
+
+    // Reset monitoring state
+    if (isMonitoring) {
+        isMonitoring = false;
+        if (checkEmailTimer->IsRunning()) {
+            checkEmailTimer->Stop();
+        }
+    }
+
+    // Reset connection status label
+    lblConnectionStatus->SetLabel("Status: OFF");
+
+    // Reset OAuth tokens
+    accessToken.clear();
+    refreshToken.clear();
+
+    // Reset email handler if exists
+    if (emailHandler) {
+        delete emailHandler;
+        emailHandler = nullptr;
+    }
+
+    // Reset oauth object
+    if (oauth) {
+        delete oauth; // Giải phóng bộ nhớ nếu đã có
+        oauth = nullptr; // Đặt lại về nullptr
+    }
+
+    // Optional: Clear command list
+    if (txtCommands) {
+        txtCommands->Clear();
+    }
+
+    // Keep the status log by not clearing txtStatus
 }
 
 void MainFrame::OnConnect(wxCommandEvent& event) {
@@ -170,45 +275,76 @@ void MainFrame::OnConnect(wxCommandEvent& event) {
         return;
     }
 
+    // Kiểm tra nếu đã kết nối thì return
+    if (socketClient->isConnected()) {
+        UpdateStatus("Already connected to server");
+        return;
+    }
+
     if (socketClient->connect(ipAddress.ToStdString(), static_cast<int>(port))) {
         UpdateStatus("Successfully connected to server");
-        UpdateConnectionStatus();
+        UpdateConnectionStatus(); // Cập nhật UI để show trạng thái connected
         btnAuthenticate->Enable();
     }
     else {
         UpdateStatus("Failed to connect to server");
+        ResetApplicationState(); // Reset UI nếu kết nối thất bại
     }
 }
 
 void MainFrame::OnDisconnect(wxCommandEvent& event) {
+    // Kiểm tra xem có đang kết nối không
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Not connected to any server");
+        ResetApplicationState();
+        return;
+    }
+
     if (socketClient->disconnect()) {
         UpdateStatus("Disconnected from server");
-        UpdateConnectionStatus();
-        btnAuthenticate->Disable();
-        btnStartMonitoring->Disable();
-        if (isMonitoring) {
-            isMonitoring = false;
-            checkEmailTimer->Stop();
-        }
+        ResetApplicationState(); // Reset UI sau khi disconnect thành công
     }
     else {
         UpdateStatus("Failed to disconnect from server");
+        // Có thể thêm logic retry disconnect ở đây nếu cần
     }
 }
 
+// Và sửa lại hàm UpdateConnectionStatus để sử dụng isConnected
+void MainFrame::UpdateConnectionStatus() {
+    if (socketClient && socketClient->isConnected()) {
+        lblConnectionStatus->SetLabel("Status: ON");
+        lblConnectionStatus->SetForegroundColour(*wxGREEN);
+        btnConnect->Disable();
+        wxWindow* btnDisconnect = FindWindow(ID_DISCONNECT);
+        if (btnDisconnect) btnDisconnect->Enable();
+    }
+    else {
+        lblConnectionStatus->SetLabel("Status: OFF");
+        lblConnectionStatus->SetForegroundColour(wxColour(255, 99, 71));
+        btnConnect->Enable();
+        wxWindow* btnDisconnect = FindWindow(ID_DISCONNECT);
+        if (btnDisconnect) btnDisconnect->Disable();
+    }
+    lblConnectionStatus->Refresh();
+    lblConnectionStatus->Update();
+}
+
 void MainFrame::OnAuthenticate(wxCommandEvent& event) {
+    // Khởi tạo lại đối tượng oauth mỗi khi xác thực
     if (oauth == nullptr) {
         oauth = new GoogleOAuth(clientId, clientSecret, REDIRECT_URI);
-        std::string authUrl = oauth->getAuthUrl();
+    }
 
-        if ((size_t)ShellExecuteA(NULL, "open", authUrl.c_str(), NULL, NULL, SW_SHOWNORMAL) > 32) {
-            UpdateStatus("Browser opened for authentication. Please enter the code when redirected.");
-            btnAuthenticate->Disable();
-            btnSubmitAuth->Enable();
-        }
-        else {
-            UpdateStatus("Failed to open browser. Please visit this URL manually:\n" + authUrl);
-        }
+    std::string authUrl = oauth->getAuthUrl();
+
+    if ((size_t)ShellExecuteA(NULL, "open", authUrl.c_str(), NULL, NULL, SW_SHOWNORMAL) > 32) {
+        UpdateStatus("Browser opened for authentication. Please enter the code when redirected.");
+        btnAuthenticate->Disable();
+        btnSubmitAuth->Enable();
+    }
+    else {
+        UpdateStatus("Failed to open browser. Please visit this URL manually:\n" + authUrl);
     }
 }
 
@@ -250,44 +386,47 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             UpdateStatus("Failed to send email content to server");
             return;
         }
-
         std::string filename = "";
         if (emailInfo.content == "list app" || emailInfo.content == "list service") {
-            std::string filename = "";
-            if (emailInfo.content == "list app" || emailInfo.content == "list service") {
-                filename = (emailInfo.content == "list app") ? "applications.txt" : "services.txt";
-                socketClient->receiveAndSaveFile(filename);
-            }
-            else if (emailInfo.content == "list process" || emailInfo.content == "help") {
-                filename = (emailInfo.content == "list process") ? "processes.txt" : "help.txt";
-                socketClient->receiveAndSaveFile(filename);
-            }
-            else if (emailInfo.content == "screenshot" || emailInfo.content == "open_cam") {
-                filename = (emailInfo.content == "screenshot") ? "screenshot.png" : "webcam_screenshot.png";
-                socketClient->receiveAndSaveImage(filename);
-            }
-            else if (emailInfo.content.substr(0, 4) == "view") {
-                filename = "received_file.txt";
-                socketClient->receiveAndSaveFile(filename);
-            }
-
-            // Send reply email
-            std::string replyMessage = "This is an automated reply to your email: " + emailInfo.content;
-            bool success = emailHandler->sendReplyEmail(
-                emailInfo.from,
-                emailInfo.subject,
-                replyMessage,
-                emailInfo.threadId,
-                filename
-            );
-
-            if (success) {
-                UpdateStatus("Reply sent successfully with attachment");
-            }
-            else {
-                UpdateStatus("Failed to send reply with attachment");
-            }
+            filename = (emailInfo.content == "list app") ? "applications.txt" : "services.txt";
+            socketClient->receiveAndSaveFile(filename);
         }
+        else if (emailInfo.content == "list process" || emailInfo.content == "help") {
+            filename = (emailInfo.content == "list process") ? "processes.txt" : "help.txt";
+            socketClient->receiveAndSaveFile(filename);
+        }
+        else if (emailInfo.content == "screenshot" || emailInfo.content == "open_cam") {
+            filename = (emailInfo.content == "screenshot") ? "screenshot.png" : "webcam.png";
+            socketClient->receiveAndSaveImage(filename);
+        }
+        else if (emailInfo.content.substr(0, 4) == "view") {
+            filename = "received_file.txt";
+            socketClient->receiveAndSaveFile(filename);
+        }
+
+        // Lấy thư mục hiện tại nơi ứng dụng đang chạy
+        wxString currentDir = wxGetCwd(); // Lấy working directory hiện tại
+        wxString filePath = wxFileName(currentDir, filename).GetFullPath();
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
+
+        // Send reply email
+        std::string replyMessage = "This is an automated reply to your email: " + emailInfo.content;
+        bool success = emailHandler->sendReplyEmail(
+            emailInfo.from,
+            emailInfo.subject,
+            replyMessage,
+            emailInfo.threadId,
+            filename
+        );
+
+        if (success) {
+            UpdateStatus("Reply sent successfully with attachment");
+        }
+        else {
+            UpdateStatus("Failed to send reply with attachment");
+        }
+        
     }
 }
 
@@ -324,9 +463,14 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         if (saveFileDialog.ShowModal() == wxID_CANCEL)
             return;
 
+        wxString filePath = saveFileDialog.GetPath();
         // Lưu file với tên và đường dẫn đã chọn
         socketClient->receiveAndSaveFile(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Applications list saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         // Tự động mở file sau khi lưu
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
@@ -349,8 +493,13 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         if (saveFileDialog.ShowModal() == wxID_CANCEL)
             return;
 
+        wxString filePath = saveFileDialog.GetPath();
         socketClient->receiveAndSaveFile(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Process list saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
     }
@@ -372,8 +521,13 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         if (saveFileDialog.ShowModal() == wxID_CANCEL)
             return;
 
+        wxString filePath = saveFileDialog.GetPath();
         socketClient->receiveAndSaveFile(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Services list saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
     }
@@ -395,8 +549,13 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         if (saveFileDialog.ShowModal() == wxID_CANCEL)
             return;
 
+        wxString filePath = saveFileDialog.GetPath();
         socketClient->receiveAndSaveImage(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Screenshot saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
     }
@@ -420,8 +579,13 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             return;
 
         // Lưu ảnh vào đường dẫn đã chọn
+        wxString filePath = saveFileDialog.GetPath();
         socketClient->receiveAndSaveImage(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Webcam image saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         // Mở ảnh sau khi lưu
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
@@ -444,8 +608,13 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         if (saveFileDialog.ShowModal() == wxID_CANCEL)
             return;
 
+        wxString filePath = saveFileDialog.GetPath();
         socketClient->receiveAndSaveFile(saveFileDialog.GetPath().ToStdString());
         UpdateStatus("Help information saved to " + saveFileDialog.GetPath());
+
+        // Gửi đường dẫn đến file cho server
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
 
         ShellExecuteA(NULL, "open", saveFileDialog.GetPath().c_str(), NULL, NULL, SW_SHOW);
     }

@@ -47,12 +47,13 @@ bool SocketClient::connect(const string& serverIP, int port) {
         return false;
     }
 
+    connected = true;  // Set trạng thái connected khi kết nối thành công
     return true;
 }
 
 bool SocketClient::disconnect() {
-    if (!connected) {
-        return true;  // Đã disconnect rồi
+    if (clientSocket == INVALID_SOCKET) {
+        return true;  // Socket đã đóng rồi
     }
 
     if (closesocket(clientSocket) == SOCKET_ERROR) {

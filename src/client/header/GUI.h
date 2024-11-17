@@ -58,6 +58,7 @@ private:
     void UpdateStatus(const wxString& message);
     void UpdateConnectionStatus();
     void UpdateCommandsList(const std::string& command);
+    void ResetApplicationState(); // Added this method declaration
 
     // Event handlers
     void OnConnect(wxCommandEvent& event);

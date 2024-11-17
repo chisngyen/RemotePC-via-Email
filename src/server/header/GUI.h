@@ -7,21 +7,22 @@
 
 #define DEFAULT_PORT "27015"
 
+
 // Custom event for logging
 wxDECLARE_EVENT(wxEVT_SERVER_LOG, wxCommandEvent);
 
 class ServerFrame : public wxFrame {
 public:
     ServerFrame(const wxString& title);
-    virtual ~ServerFrame();
+    ~ServerFrame();
 
 private:
     // GUI Controls
     wxButton* startButton;
     wxButton* stopButton;
     wxStaticText* statusText;
-    wxListCtrl* clientList;
-    wxTextCtrl* logArea;
+    wxListCtrl* logList;
+    wxTextCtrl* messageLog;  // For normal messages
 
     // Server components
     SocketServer* server;
@@ -29,18 +30,29 @@ private:
     bool isRunning;
     Command cmd;
 
-    // Event handling methods
+    // Event handlers
     void OnStart(wxCommandEvent& event);
     void OnStop(wxCommandEvent& event);
     void OnClose(wxCloseEvent& event);
     void OnLogEvent(wxCommandEvent& event);
+    void OnLogItemDblClick(wxListEvent& event);
 
-    // Server methods
+    // Server control methods
     void StartServer();
     void StopServer();
     void ServerLoop();
-    void UpdateClientList();
-    void LogMessage(const wxString& message);
+
+    // Logging methods
+    void LogMessage(const wxString& message, const wxString& details = "", bool isCommand = false);
+
+    // Store command responses for double-click viewing
+    struct LogEntry {
+        wxString message;
+        wxString details;
+        bool isCommand;
+        wxString savedPath;  
+    };
+    std::vector<LogEntry> logEntries;
 
     DECLARE_EVENT_TABLE()
 };

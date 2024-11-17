@@ -2,69 +2,100 @@
 #include <wx/wx.h>
 #include <wx/stattext.h>
 #include <sstream>
-#include <thread>
-#include <vector>
-#include <string>
+#include <fstream>
+#include <ctime>
+#include <iomanip>
 
-// Define custom event
 wxDEFINE_EVENT(wxEVT_SERVER_LOG, wxCommandEvent);
 
-// Event table
 BEGIN_EVENT_TABLE(ServerFrame, wxFrame)
 EVT_BUTTON(1001, ServerFrame::OnStart)
 EVT_BUTTON(1002, ServerFrame::OnStop)
 EVT_CLOSE(ServerFrame::OnClose)
 EVT_COMMAND(wxID_ANY, wxEVT_SERVER_LOG, ServerFrame::OnLogEvent)
+EVT_LIST_ITEM_ACTIVATED(wxID_ANY, ServerFrame::OnLogItemDblClick)
 END_EVENT_TABLE()
 
-// Constructor implementation
 ServerFrame::ServerFrame(const wxString& title)
     : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(800, 600))
 {
     wxPanel* panel = new wxPanel(this);
+    panel->SetBackgroundColour(wxColour(30, 33, 41));
+
+    wxFont defaultFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
+    panel->SetFont(defaultFont);
+
     wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
 
-    // Top bar with status
-    wxBoxSizer* topBarSizer = new wxBoxSizer(wxHORIZONTAL);
+    // Server Control Section
+    wxStaticBoxSizer* controlSizer = new wxStaticBoxSizer(wxHORIZONTAL, panel, "Server Control");
+    wxStaticBox* controlBox = controlSizer->GetStaticBox();
+    controlBox->SetForegroundColour(wxColour(255, 255, 255));
+    controlBox->SetBackgroundColour(wxColour(37, 41, 51));
 
-    // Button group
     wxBoxSizer* buttonSizer = new wxBoxSizer(wxHORIZONTAL);
-    startButton = new wxButton(panel, 1001, "Start Server");
-    stopButton = new wxButton(panel, 1002, "Stop Server");
+
+    startButton = new wxButton(panel, 1001, "Start Server", wxDefaultPosition, wxSize(100, 30));
+    startButton->SetBackgroundColour(wxColour(0, 150, 136));
+    startButton->SetForegroundColour(wxColour(255, 255, 255));
+
+    stopButton = new wxButton(panel, 1002, "Stop Server", wxDefaultPosition, wxSize(100, 30));
+    stopButton->SetBackgroundColour(wxColour(239, 83, 80));
+    stopButton->SetForegroundColour(wxColour(255, 255, 255));
     stopButton->Disable();
+
     buttonSizer->Add(startButton, 0, wxALL, 5);
     buttonSizer->Add(stopButton, 0, wxALL, 5);
 
-    // Status indicator
     wxBoxSizer* statusSizer = new wxBoxSizer(wxHORIZONTAL);
     wxStaticText* statusLabel = new wxStaticText(panel, wxID_ANY, "Status:");
+    statusLabel->SetForegroundColour(wxColour(255, 255, 255));
+
     statusText = new wxStaticText(panel, wxID_ANY, "OFF");
     statusText->SetForegroundColour(*wxRED);
+    statusText->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
 
     statusSizer->Add(statusLabel, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
     statusSizer->Add(statusText, 0, wxALIGN_CENTER_VERTICAL);
 
-    // Add button group and status to top bar
-    topBarSizer->Add(buttonSizer, 0, wxALIGN_CENTER_VERTICAL);
-    topBarSizer->AddStretchSpacer();
-    topBarSizer->Add(statusSizer, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+    controlSizer->Add(buttonSizer, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+    controlSizer->AddStretchSpacer();
+    controlSizer->Add(statusSizer, 0, wxALIGN_CENTER_VERTICAL | wxALL, 10);
 
-    mainSizer->Add(topBarSizer, 0, wxEXPAND | wxALL, 5);
+    mainSizer->Add(controlSizer, 0, wxEXPAND | wxALL, 10);
 
-    // Client list
-    clientList = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxSize(-1, 150),
+    // Client Commands Log Section
+    wxStaticBoxSizer* commandLogSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Client Commands");
+    wxStaticBox* commandLogBox = commandLogSizer->GetStaticBox();
+    commandLogBox->SetForegroundColour(wxColour(255, 255, 255));
+    commandLogBox->SetBackgroundColour(wxColour(37, 41, 51));
+
+    logList = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxSize(-1, 200),
         wxLC_REPORT | wxLC_SINGLE_SEL);
-    clientList->InsertColumn(0, "Client IP", wxLIST_FORMAT_LEFT, 150);
-    clientList->InsertColumn(1, "Status", wxLIST_FORMAT_LEFT, 100);
-    mainSizer->Add(clientList, 0, wxEXPAND | wxALL, 5);
+    logList->SetBackgroundColour(wxColour(45, 48, 58));
+    logList->SetForegroundColour(wxColour(255, 255, 255));
 
-    // Communication log area
-    wxStaticText* logLabel = new wxStaticText(panel, wxID_ANY, "Client Communication Log:");
-    mainSizer->Add(logLabel, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+    logList->InsertColumn(0, "Time", wxLIST_FORMAT_LEFT, 150);
+    logList->InsertColumn(1, "Command", wxLIST_FORMAT_LEFT, 500);
 
-    logArea = new wxTextCtrl(panel, wxID_ANY, wxEmptyString, wxDefaultPosition,
+    commandLogSizer->Add(logList, 0, wxEXPAND | wxALL, 5);
+
+    mainSizer->Add(commandLogSizer, 0, wxEXPAND | wxALL, 10);
+
+    // Server Messages Log Section
+    wxStaticBoxSizer* messageLogSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Server Messages");
+    wxStaticBox* messageLogBox = messageLogSizer->GetStaticBox();
+    messageLogBox->SetForegroundColour(wxColour(255, 255, 255));
+    messageLogBox->SetBackgroundColour(wxColour(37, 41, 51));
+
+    messageLog = new wxTextCtrl(panel, wxID_ANY, wxEmptyString, wxDefaultPosition,
         wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
-    mainSizer->Add(logArea, 1, wxEXPAND | wxALL, 5);
+    messageLog->SetBackgroundColour(wxColour(45, 48, 58));
+    messageLog->SetForegroundColour(wxColour(255, 255, 255));
+
+    messageLogSizer->Add(messageLog, 1, wxEXPAND | wxALL, 5);
+
+    mainSizer->Add(messageLogSizer, 1, wxEXPAND | wxALL, 10);
 
     panel->SetSizer(mainSizer);
 
@@ -75,12 +106,10 @@ ServerFrame::ServerFrame(const wxString& title)
     Center();
 }
 
-// Destructor implementation
 ServerFrame::~ServerFrame() {
     StopServer();
 }
 
-// Event handlers
 void ServerFrame::OnStart(wxCommandEvent& event) {
     if (!isRunning) {
         StartServer();
@@ -99,20 +128,53 @@ void ServerFrame::OnClose(wxCloseEvent& event) {
 }
 
 void ServerFrame::OnLogEvent(wxCommandEvent& event) {
-    logArea->AppendText(event.GetString() + "\n");
+    LogEntry* entry = static_cast<LogEntry*>(event.GetClientData());
+    if (!entry) return;
+
+    if (entry->isCommand) {
+        // Get current time
+        auto now = std::time(nullptr);
+        auto tm = *std::localtime(&now);
+        std::ostringstream timeStr;
+        timeStr << std::put_time(&tm, "%H:%M:%S");
+
+        // Add to list control
+        long itemIndex = logList->InsertItem(logList->GetItemCount(), timeStr.str());
+        logList->SetItem(itemIndex, 1, entry->message);
+
+        // Store the log entry
+        logEntries.push_back(*entry);
+    }
+    else {
+        // Add to message log
+        messageLog->AppendText(entry->message + "\n");
+    }
+
+    delete entry;
 }
 
-// Server control methods
+void ServerFrame::OnLogItemDblClick(wxListEvent& event) {
+    long index = event.GetIndex();
+    if (index >= 0 && static_cast<size_t>(index) < logEntries.size()) {
+        const LogEntry& entry = logEntries[index];
+
+        // N?u có ???ng d?n ?ã l?u thì m? file
+        if (!entry.savedPath.IsEmpty()) {
+            wxLaunchDefaultApplication(entry.savedPath);
+        }
+    }
+}
+
 void ServerFrame::StartServer() {
     server = new SocketServer(DEFAULT_PORT);
 
     if (!server->initialize()) {
-        LogMessage("Failed to initialize Winsock.");
+        LogMessage("Failed to initialize Winsock", "", false);
         return;
     }
 
     if (!server->createListener()) {
-        LogMessage("Failed to create listening socket.");
+        LogMessage("Failed to create listening socket", "", false);
         delete server;
         server = nullptr;
         return;
@@ -147,7 +209,6 @@ void ServerFrame::StopServer() {
         statusText->SetForegroundColour(*wxRED);
         startButton->Enable();
         stopButton->Disable();
-        clientList->DeleteAllItems();
     }
 }
 
@@ -157,8 +218,7 @@ void ServerFrame::ServerLoop() {
             continue;
         }
 
-        LogMessage("New client connected");
-        UpdateClientList();
+        LogMessage("New client connected", "", false);
 
         while (isRunning) {
             string command = server->receiveMessage();
@@ -166,83 +226,77 @@ void ServerFrame::ServerLoop() {
             if (!isRunning) break;
 
             if (command.empty()) {
-                LogMessage("Client disconnected");
+                LogMessage("Client disconnected", "", false);
                 break;
             }
 
-            // Log client request
-            LogMessage("Client: " + command);
-
-            // Process commands and log responses
-            if (command == "list app") {
-                string applist = cmd.Applist();
-                if (server->sendMessage(applist)) {
-                    LogMessage("Server: Sent application list");
+            if (command.substr(0, 10) == "save_path:") {
+                string path = command.substr(10);
+                // Tìm và c?p nh?t LogEntry cu?i cùng v?i ???ng d?n file
+                if (!logEntries.empty()) {
+                    logEntries.back().savedPath = wxString::FromUTF8(path);
                 }
+                continue;
+            }
+
+            string response;
+            vector<BYTE> imageData;
+
+            // Log command t? client
+            LogMessage(command, "", true);
+
+            if (command == "list app") {
+                response = cmd.Applist();
+                server->sendMessage(response);
+                LogMessage("Server: Sent application list", response, false);
             }
             else if (command == "list service") {
-                string servicelist = cmd.Listservice();
-                if (server->sendMessage(servicelist)) {
-                    LogMessage("Server: Sent service list");
-                }
+                response = cmd.Listservice();
+                server->sendMessage(response);
+                LogMessage("Server: Sent service list", response, false);
             }
             else if (command == "list process") {
-                string processList = cmd.Listprocess();
-                if (server->sendMessage(processList)) {
-                    LogMessage("Server: Sent process list");
-                }
+                response = cmd.Listprocess();
+                server->sendMessage(response);
+                LogMessage("Server: Sent process list", response, false);
             }
             else if (command == "help") {
-                string helps = cmd.help();
-                if (server->sendMessage(helps)) {
-                    LogMessage("Server: Sent help information");
-                }
+                response = cmd.help();
+                server->sendMessage(response);
+                LogMessage("Server: Sent help information", response, false);
             }
             else if (command == "screenshot") {
                 int width, height;
-                vector<BYTE> image = cmd.captureScreenWithGDIPlus(width, height);
-                cmd.sendImage(server->getClientSocket(), image);
-                LogMessage("Server: Sent screenshot");
+                imageData = cmd.captureScreenWithGDIPlus(width, height);
+                cmd.sendImage(server->getClientSocket(), imageData);
+                LogMessage("Server: Sent screenshot", "Screenshot taken", false);
             }
             else if (command == "shutdown") {
-                LogMessage("Server: Executing shutdown command");
+                LogMessage("Server: Executing shutdown command", "", false);
                 cmd.shutdownComputer();
             }
             else if (command == "open_cam") {
                 cmd.openCamera();
                 Sleep(2000);
                 int width, height;
-                vector<BYTE> image = cmd.captureScreenWithGDIPlus(width, height);
-                cmd.sendImage(server->getClientSocket(), image);
-                LogMessage("Server: Camera has been opened");
+                imageData = cmd.captureScreenWithGDIPlus(width, height);
+                cmd.sendImage(server->getClientSocket(), imageData);
+                LogMessage("Server: Camera capture taken", "", false);
             }
         }
 
         server->closeClientConnection();
-        clientList->DeleteAllItems();
-    }
-}
-// GUI update methods
-void ServerFrame::UpdateClientList() {
-    wxCommandEvent* event = new wxCommandEvent(wxEVT_SERVER_LOG);
-    event->SetString("Updating client list...");
-    wxQueueEvent(this, event);
-
-    clientList->DeleteAllItems();
-    if (server && server->getClientSocket() != INVALID_SOCKET) {
-        sockaddr_in addr;
-        int addrlen = sizeof(addr);
-        getpeername(server->getClientSocket(), (sockaddr*)&addr, &addrlen);
-        char ipstr[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &addr.sin_addr, ipstr, sizeof(ipstr));
-
-        long itemIndex = clientList->InsertItem(0, ipstr);
-        clientList->SetItem(itemIndex, 1, "Connected");
     }
 }
 
-void ServerFrame::LogMessage(const wxString& message) {
+void ServerFrame::LogMessage(const wxString& message, const wxString& details, bool isCommand) {
+    LogEntry* entry = new LogEntry{
+        message,
+        details,
+        isCommand
+    };
+
     wxCommandEvent* event = new wxCommandEvent(wxEVT_SERVER_LOG);
-    event->SetString(message);
+    event->SetClientData(entry);
     wxQueueEvent(this, event);
 }

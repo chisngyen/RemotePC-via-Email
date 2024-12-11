@@ -1,4 +1,4 @@
-#include "CommandExecutor.h"
+﻿#include "CommandExecutor.h"
 
 Command::Command() {
     InitializeGDIPlus(gdiplusToken);
@@ -24,54 +24,84 @@ void Command::SendMessages(SOCKET clientSocket, const std::string& message) {
 }
 
 void Command::sendFile(SOCKET clientSocket, const std::string& fileName) {
-    std::ifstream file(fileName, std::ios::binary);
+    std::ifstream file(fileName, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
+        std::cout << "[ERROR] Unable to open file: " << fileName << std::endl;
         SendMessages(clientSocket, "Unable to open file.");
         return;
     }
+
+    std::streamsize fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::cout << "[INFO] Sending file size: " << fileSize << " bytes" << std::endl;
+    send(clientSocket, (char*)&fileSize, sizeof(fileSize), 0);
+
     char buffer[DEFAULT_BUFLEN];
-    while (!file.eof()) {
+    std::streamsize totalSent = 0;
+
+    while (totalSent < fileSize) {
         file.read(buffer, DEFAULT_BUFLEN);
         int bytesRead = file.gcount();
-        send(clientSocket, buffer, bytesRead, 0);
+
+        int bytesSent = 0;
+        while (bytesSent < bytesRead) {
+            int result = send(clientSocket, buffer + bytesSent, bytesRead - bytesSent, 0);
+            if (result == SOCKET_ERROR) {
+                std::cout << "[ERROR] Failed to send file. WSA Error: " << WSAGetLastError() << std::endl;
+                SendMessages(clientSocket, "Error occurred while sending file.");
+                file.close();
+                return;
+            }
+            bytesSent += result;
+        }
+        totalSent += bytesSent;
+        std::cout << "[INFO] Progress: " << totalSent << "/" << fileSize << " bytes sent" << std::endl;
     }
+
     file.close();
+    std::cout << "[SUCCESS] File sent successfully: " << fileName << std::endl;
+    SendMessages(clientSocket, "File sent successfully.");
 }
 
-void Command::handleViewFile(SOCKET clientSocket, const std::string& fileName) {
-    std::ifstream file(fileName);
-    if (!file.is_open()) {
-        SendMessages(clientSocket, "Unable to open file.");
+void Command::handleGetFile(SOCKET clientSocket, const std::string& fileName) {
+    std::ifstream checkFile(fileName);
+    if (!checkFile.good()) {
+        std::cout << "[ERROR] File does not exist: " << fileName << std::endl;
+        SendMessages(clientSocket, "File not found.");
         return;
     }
+    checkFile.close();
+
+    std::cout << "[INFO] Processing file request: " << fileName << std::endl;
     sendFile(clientSocket, fileName);
 }
 
 void Command::handleDeleteFile(SOCKET clientSocket, const string& fileName) {
-    cout << fileName;
-    if (DeleteFileA(fileName.c_str())) {
-        SendMessages(clientSocket, "File successfully deleted.");
-    }
-    else {
-        SendMessages(clientSocket, "Unable to delete file.");
-    }
-}
+    std::cout << "[INFO] Attempting to delete file: " << fileName << std::endl;
 
-void Command::handleClientCommands(SOCKET clientSocket, string command) {
-    string action, fileName;
-    size_t spacePos = command.find(' ');
-    if (spacePos != string::npos) {
-        action = command.substr(0, spacePos);
-        fileName = command.substr(spacePos + 1);
+    std::ifstream checkFile(fileName);
+    if (!checkFile.good()) {
+        std::cout << "[ERROR] File does not exist: " << fileName << std::endl;
+        SendMessages(clientSocket, "File not found.");
+        return;
     }
-    if (action == "view") {
-        handleViewFile(clientSocket, fileName);
+    checkFile.close();
+
+    if (std::remove(fileName.c_str()) == 0) {
+        std::cout << "[SUCCESS] File deleted successfully: " << fileName << std::endl;
+        SendMessages(clientSocket, "File deleted successfully.");
+        return;
     }
-    else if (action == "delete") {
-        handleDeleteFile(clientSocket, fileName);
+
+    if (DeleteFileA(fileName.c_str())) {
+        std::cout << "[SUCCESS] File deleted successfully using Windows API: " << fileName << std::endl;
+        SendMessages(clientSocket, "File deleted successfully.");
     }
     else {
-        SendMessages(clientSocket, "Invalid command.");
+        DWORD error = GetLastError();
+        std::cout << "[ERROR] Failed to delete file. Error code: " << error << std::endl;
+        SendMessages(clientSocket, "Unable to delete file. Error code: " + std::to_string(error));
     }
 }
 
@@ -301,19 +331,89 @@ void Command::shutdownComputer() {
     system("shutdown /s /t 0");
 }
 
+void Command::restartComputer() {
+    system("shutdown /r /t 0");  
+}
+
+void Command::lockScreen() {
+    LockWorkStation(); 
+}
+
 string Command::help() {
     string helps = "HELP\n";
     helps += "=====\n";
     helps += "Functions performed by the server: \n";
-    helps += "  1. Check list applications: list app\n";
-    helps += "  2. Check list process: list process\n";
-    helps += "  3. Check list services: list service\n";
-    helps += "  4. Screenshot: screenshot\n";
-    helps += "  5. Select file: view [name_file]\n";
-    helps += "  6. Delete file: delete [name_file]\n";
-    helps += "  7. Open webcam: open_cam\n";
-    helps += "  8. Close wbcam: close_cam\n";
-    helps += "  9. Shut down computer: shutdown\n";
-    helps += " 10. Help: help\n";
+    helps += "  1. Check list applications: list::app\n";
+    helps += "  2. Check list process: list::process\n";
+    helps += "  3. Check list services: list::service\n";
+    helps += "  4. Screenshot: screenshot::capture\n";
+    helps += "  5. Select file: file::get [path_file]\n";
+    helps += "  6. Delete file: file::delete [path_file]\n";
+    helps += "  7. Open webcam: camera::open\n";
+    helps += "  8. Close webcam: camera::close\n";
+    helps += "  9. Start application: app::start [app_name]\n";
+    helps += " 10. Stop application: app::stop [app_name]\n";
+    helps += " 11. Shut down computer: system::shutdown\n";
+    helps += " 12. Restart computer: system::restart\n";
+    helps += " 13. Lock screen: system::lock\n";
+    helps += " 14. Help: help::cmd\n";
     return helps;
+}
+
+void Command::startApplication(const string& appName) {
+    SHELLEXECUTEINFOA sei = { 0 };
+    sei.cbSize = sizeof(SHELLEXECUTEINFOA);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = "open";
+    sei.lpFile = appName.c_str();
+    sei.nShow = SW_SHOW;
+
+    if (ShellExecuteExA(&sei)) {
+        currentAppHandle = sei.hProcess;
+        currentAppPID = GetProcessId(sei.hProcess);
+        string response = "Application " + appName + " started successfully (PID: " + to_string(currentAppPID) + ")";
+        cout << response << endl;
+    }
+    else {
+        DWORD error = GetLastError();
+        string response = "Failed to start " + appName + ". Error code: " + to_string(error);
+        cout << response << endl;
+    }
+}
+
+void Command::stopApplication(const string& appName) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        cout << "Failed to create process snapshot" << endl;
+        return;
+    }
+
+    PROCESSENTRY32W processEntry;
+    processEntry.dwSize = sizeof(processEntry);
+
+    bool found = false;
+    if (Process32FirstW(snapshot, &processEntry)) {
+        do {
+            // Convert WCHAR array to string for comparison
+            wstring wProcessName = processEntry.szExeFile;
+            string processName(wProcessName.begin(), wProcessName.end());
+
+            if (_stricmp(processName.c_str(), appName.c_str()) == 0) {
+                HANDLE processHandle = OpenProcess(PROCESS_TERMINATE, FALSE, processEntry.th32ProcessID);
+                if (processHandle != NULL) {
+                    if (TerminateProcess(processHandle, 0)) {
+                        found = true;
+                        cout << "Successfully terminated " << appName << endl;
+                    }
+                    CloseHandle(processHandle);
+                }
+            }
+        } while (Process32NextW(snapshot, &processEntry));
+    }
+
+    CloseHandle(snapshot);
+
+    if (!found) {
+        cout << "Could not find or terminate " << appName << endl;
+    }
 }

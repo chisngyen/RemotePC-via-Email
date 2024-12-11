@@ -13,33 +13,20 @@
 #include "socket.h"
 #include "handleMail.h"
 #include "GmailAPI.h"
+#include "Login_GUI.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
-// Define the Application class
 class MyApp : public wxApp {
 public:
     virtual bool OnInit() {
-        // Create the main application window
-        MainFrame* frame = new MainFrame("Email Monitoring Application");
-
-        // Show the frame
-        frame->Show(true);
-
-        // Set as the top window
-        SetTopWindow(frame);
-
+        // Create and show the login window first
+        LoginFrame* loginFrame = new LoginFrame("Gmail Login");
+        loginFrame->Show(true);
+        SetTopWindow(loginFrame);
         return true;
     }
 };
 
 // Implement the wxApp
 wxIMPLEMENT_APP(MyApp);
-
-// If you need the old console-based main for testing, you can keep it commented:
-/*
-int main_console() {
-    // Your original console-based main code here
-    return 0;
-}
-*/

@@ -10,6 +10,9 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <gdiplus.h>
+#include <thread>
+#include <chrono>
+
 
 // Add these pragma comments
 #pragma comment(lib, "gdiplus.lib")
@@ -32,6 +35,9 @@ private:
     void InitializeGDIPlus(ULONG_PTR& gdiplusToken);
     void ShutdownGDIPlus(ULONG_PTR gdiplusToken);
 
+    //App
+    HANDLE currentAppHandle = NULL;
+    DWORD currentAppPID = 0;
 
 public:
     Command();
@@ -59,11 +65,18 @@ public:
 
     // System commands
     void shutdownComputer();
+    void restartComputer();
+    void lockScreen();
+
     string help();
 
     void SendMessages(SOCKET clientSocket, const std::string& message);
     void sendFile(SOCKET clientSocket, const std::string& fileName);
-    void handleViewFile(SOCKET clientSocket, const std::string& fileName);
+    void handleGetFile(SOCKET clientSocket, const std::string& fileName);
     void handleDeleteFile(SOCKET clientSocket, const string& fileName);
-    void handleClientCommands(SOCKET clientSocket, string command);
+
+    //Start/Stop app
+    void startApplication(const string& appName);
+    void stopApplication(const string& appName);
+
 };

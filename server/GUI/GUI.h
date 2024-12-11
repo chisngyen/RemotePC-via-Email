@@ -17,6 +17,12 @@ public:
     ~ServerFrame();
 
 private:
+    void FormatCommand(wxString& command);
+    void OnClearHistory(wxCommandEvent& event);
+
+    void OnButtonHover(wxMouseEvent& event);
+    void OnButtonLeave(wxMouseEvent& event);
+
     // GUI Controls
     wxButton* startButton;
     wxButton* stopButton;

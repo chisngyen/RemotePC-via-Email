@@ -4,6 +4,7 @@
 BEGIN_EVENT_TABLE(LoginFrame, wxFrame)
 EVT_BUTTON(ID_LOGIN_BUTTON, LoginFrame::OnLogin)
 EVT_PAINT(LoginFrame::OnPaint)
+EVT_CLOSE(LoginFrame::OnClose)
 END_EVENT_TABLE()
 
 LoginFrame::LoginFrame(const wxString& title)
@@ -19,7 +20,7 @@ LoginFrame::LoginFrame(const wxString& title)
     // Title Section
     wxBoxSizer* titleSizer = new wxBoxSizer(wxVERTICAL);
 
-    wxStaticText* welcomeText = new wxStaticText(panel, wxID_ANY, "Remote Control");
+    wxStaticText* welcomeText = new wxStaticText(panel, wxID_ANY, "Email PC Control");
     welcomeText->SetForegroundColour(wxColour(255, 255, 255));
     wxFont welcomeFont = welcomeText->GetFont();
     welcomeFont.SetPointSize(24);
@@ -51,13 +52,9 @@ LoginFrame::LoginFrame(const wxString& title)
     wxBoxSizer* gmailSizer = new wxBoxSizer(wxHORIZONTAL);
 
     // Question mark icon with better alignment
-    wxStaticText* emailIcon = new wxStaticText(inputPanel, wxID_ANY, "✉",
-        wxDefaultPosition, wxSize(30, -1),
-        wxALIGN_CENTER);
-    emailIcon->SetForegroundColour(wxColour(139, 148, 158));
-    wxFont iconFont = emailIcon->GetFont();
-    iconFont.SetPointSize(14);
-    emailIcon->SetFont(iconFont);
+    wxBitmap emailIcon = wxArtProvider::GetBitmap(wxART_FOLDER, wxART_FRAME_ICON, wxSize(16, 16));
+    wxStaticBitmap* iconBitmap = new wxStaticBitmap(inputPanel, wxID_ANY, emailIcon);
+    iconBitmap->SetBackgroundColour(wxColour(33, 38, 45));
 
     // Thay thế txtGmail bằng comboBox
     wxArrayString choices;
@@ -74,7 +71,7 @@ LoginFrame::LoginFrame(const wxString& title)
     // Load danh sách Gmail đã lưu
     LoadSavedGmails();
 
-    gmailSizer->Add(emailIcon, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
+    gmailSizer->Add(iconBitmap, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     gmailSizer->Add(gmailComboBox, 1, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
     inputPanel->SetSizer(gmailSizer);
@@ -166,9 +163,17 @@ void LoginFrame::OnLogin(wxCommandEvent& event)
     MainFrame* mainFrame = new MainFrame("Email Monitoring Application");
     mainFrame->SetUserGmail(gmail);
     mainFrame->SetParentFrame(this);
-    mainFrame->AutoStartAuthentication();
-}
 
+    std::string existingToken = tokenManager.getRefreshToken(gmail.ToStdString());
+    if (!existingToken.empty()) {
+        mainFrame->SetExistingRefreshToken(existingToken);
+        mainFrame->Show(); 
+        Hide(); 
+    }
+    else {
+        mainFrame->AutoStartAuthentication();
+    }
+}
 void LoginFrame::OnPaint(wxPaintEvent& event)
 {
     wxPaintDC dc(this);
@@ -222,4 +227,11 @@ void LoginFrame::CreateGradientBackground(wxDC& dc)
             }
         }
     }
+}
+
+void LoginFrame::OnClose(wxCloseEvent& event)
+{
+    // Cleanup nếu cần
+    Destroy();  // Hủy window
+    wxExit();   // Thoát ứng dụng
 }

@@ -21,6 +21,8 @@ EVT_BUTTON(ID_SHUTDOWN, MainFrame::OnShutdown)
 EVT_BUTTON(ID_RESTART, MainFrame::OnRestart)
 EVT_BUTTON(ID_LOCKSCREEN, MainFrame::OnLockScreen)
 EVT_BUTTON(ID_TOGGLE_APP, MainFrame::OnToggleApp)
+EVT_BUTTON(ID_LOGOUT, MainFrame::OnLogout)
+EVT_CLOSE(MainFrame::OnClose)
 END_EVENT_TABLE()
 
 MainFrame::MainFrame(const wxString& title)
@@ -42,6 +44,25 @@ MainFrame::MainFrame(const wxString& title)
     // Create main panel with modern dark theme
     wxPanel* panel = new wxPanel(this);
     panel->SetBackgroundColour(wxColour(18, 18, 18));
+
+    btnLogout = new wxButton(panel, ID_LOGOUT, "Logout",
+        wxPoint(GetSize().GetWidth() - 100, 10), wxSize(80, 30));
+    btnLogout->SetBackgroundColour(wxColour(220, 53, 69));  // Màu đỏ
+    btnLogout->SetForegroundColour(wxColour(255, 255, 255));  // Chữ màu trắng
+    wxFont logoutFont = btnLogout->GetFont();
+    logoutFont.SetPointSize(9);
+    logoutFont.SetWeight(wxFONTWEIGHT_BOLD);
+    btnLogout->SetFont(logoutFont);
+
+    // Thêm hiệu ứng hover cho nút logout
+    btnLogout->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent&) {
+        btnLogout->SetBackgroundColour(wxColour(200, 35, 51));
+        btnLogout->Refresh();
+        });
+    btnLogout->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent&) {
+        btnLogout->SetBackgroundColour(wxColour(220, 53, 69));
+        btnLogout->Refresh();
+        });
 
     // Set modern font
     wxFont defaultFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
@@ -190,15 +211,6 @@ MainFrame::MainFrame(const wxString& title)
     // Add horizontal container to main panel
     wxBoxSizer* connectionContentSizer = dynamic_cast<wxBoxSizer*>(connectionPanel->GetSizer());
     connectionContentSizer->Add(horizontalContainer, 1, wxEXPAND | wxALL, 5);
-
-    //// Monitoring Section
-    //wxPanel* monitoringPanel = createSection(panel, "Email Monitoring");
-    //btnStartMonitoring = createModernButton(monitoringPanel, ID_START_MONITORING,
-    //    "Start Monitoring", wxColour(0, 150, 136));
-    //btnStartMonitoring->Disable();
-
-    //wxBoxSizer* monitoringContentSizer = dynamic_cast<wxBoxSizer*>(monitoringPanel->GetSizer());
-    //monitoringContentSizer->Add(btnStartMonitoring, 0, wxEXPAND | wxALL, 15);
 
 
     //Direct Section
@@ -400,6 +412,29 @@ MainFrame::~MainFrame() {
 
 }
 
+void MainFrame::OnLogout(wxCommandEvent& event) {
+    // Dừng tất cả các hoạt động đang chạy
+    if (isMonitoring) {
+        checkEmailTimer->Stop();
+    }
+
+    // Ngắt kết nối socket nếu đang kết nối
+    if (socketClient->isConnected()) {
+        socketClient->disconnect();
+    }
+
+    // Reset trạng thái
+    ResetApplicationState();
+
+    // Show login frame and destroy this frame
+    Hide();
+    if (parentFrame) {
+        parentFrame->Show();
+        parentFrame->Raise();
+    }
+}
+
+
 void MainFrame::UpdateCommandsList(const wxString& command, const EmailHandler::EmailInfo& emailInfo) {
     wxPanel* commandEntry = new wxPanel(commandsScroll);
     commandEntry->SetBackgroundColour(wxColour(40, 44, 52));
@@ -499,9 +534,9 @@ void MainFrame::ResetApplicationState() {
         toggleButton->SetLabel("Start App");
     }
 
-    // Reset OAuth tokens
-    accessToken.clear();
-    refreshToken.clear();
+    //// Reset OAuth tokens
+    //accessToken.clear();
+    //refreshToken.clear();
 
     if (callbackServer) {
         callbackServer->stop();
@@ -527,6 +562,22 @@ void MainFrame::ResetApplicationState() {
 
 
     // Keep the status log by not clearing txtStatus
+}
+
+void MainFrame::OnClose(wxCloseEvent& event)
+{
+    // Dừng các hoạt động
+    if (isMonitoring) {
+        checkEmailTimer->Stop();
+    }
+    if (socketClient->isConnected()) {
+        socketClient->disconnect();
+    }
+
+    // Cleanup và thoát
+    ResetApplicationState();
+    Destroy();
+    wxExit();
 }
 
 void MainFrame::OnConnect(wxCommandEvent& event) {
@@ -617,7 +668,7 @@ void MainFrame::OnAuthenticate(wxCommandEvent& event) {
         std::thread([this]() {
             // Khởi tạo automation
             if (gmailAutomation == nullptr) {
-                gmailAutomation = new GmailUIAutomation();  
+                gmailAutomation = new GmailUIAutomation();
             }
 
             // Thực hiện automation
@@ -702,7 +753,7 @@ void MainFrame::ShowWithModernEffect() {
             int newWidth = originalSize.GetWidth() * scale;
             int newHeight = originalSize.GetHeight() * scale;
             SetSize(newWidth, newHeight);
-            Centre(); 
+            Centre();
         }
 
         if (alpha < 255) {
@@ -721,6 +772,33 @@ void MainFrame::ShowWithModernEffect() {
     Raise();
 }
 
+void MainFrame::SetExistingRefreshToken(const std::string& token) {
+    try {
+        if (!oauth) {
+            LoadClientSecrets();
+            oauth = new GoogleOAuth(clientId, clientSecret, "http://localhost:8080");
+        }
+
+        refreshToken = token;
+        accessToken = oauth->getAccessToken(refreshToken);
+
+        if (!accessToken.empty()) {
+            emailHandler = new EmailHandler(accessToken);
+            UpdateStatus("Authentication successful using saved token");
+            btnStartMonitoring->Enable();
+            Show(); // Hiển thị MainFrame
+        }
+        else {
+            UpdateStatus("Saved token is no longer valid, re-authentication required");
+            AutoStartAuthentication();
+        }
+    }
+    catch (const std::exception& e) {
+        UpdateStatus("Error using saved token: " + wxString(e.what()));
+        AutoStartAuthentication();
+    }
+}
+
 void MainFrame::OnOAuthCode(wxCommandEvent& event) {
     wxString code = event.GetString();
 
@@ -735,6 +813,8 @@ void MainFrame::OnOAuthCode(wxCommandEvent& event) {
         return;
     }
 
+    tokenManager.saveRefreshToken(userGmail.ToStdString(), refreshToken);
+
     accessToken = oauth->getAccessToken(refreshToken);
     if (accessToken.empty()) {
         UpdateStatus("Unable to get access token");
@@ -747,9 +827,9 @@ void MainFrame::OnOAuthCode(wxCommandEvent& event) {
 
     // Hiện MainFrame và đóng LoginFrame
     ShowWithModernEffect();
-    
+
     if (parentFrame) {
-        parentFrame->Close();
+        parentFrame->Hide();
     }
 
 }
@@ -957,121 +1037,155 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         UpdateStatus("Disconnected from server: " + ip);
     }
 }
-    void MainFrame::OnStartMonitoring(wxCommandEvent& event) {
-        if (!isMonitoring) {
-            isMonitoring = true;
-            btnStartMonitoring->SetLabel("Stop Monitoring");
-            checkEmailTimer->Start(2000); // Check every 2 seconds
-            UpdateStatus("Started monitoring emails");
-        }
-        else {
-            isMonitoring = false;
-            btnStartMonitoring->SetLabel("Start Monitoring");
-            checkEmailTimer->Stop();
-            UpdateStatus("Stopped monitoring emails");
-        }
+void MainFrame::OnStartMonitoring(wxCommandEvent& event) {
+    if (!isMonitoring) {
+        isMonitoring = true;
+        btnStartMonitoring->SetLabel("Stop Monitoring");
+        checkEmailTimer->Start(2000); // Check every 2 seconds
+        UpdateStatus("Started monitoring emails");
+    }
+    else {
+        isMonitoring = false;
+        btnStartMonitoring->SetLabel("Start Monitoring");
+        checkEmailTimer->Stop();
+        UpdateStatus("Stopped monitoring emails");
+    }
+}
+
+void MainFrame::OnListApp(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
     }
 
-    void MainFrame::OnListApp(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    wxFileDialog saveFileDialog(this, "Save Applications List", "", "applications.txt",
+        "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
-        wxFileDialog saveFileDialog(this, "Save Applications List", "", "applications.txt",
-            "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-
-        if (saveFileDialog.ShowModal() == wxID_CANCEL) {
-            UpdateStatus("Operation cancelled: No save location selected");
-            return;
-        }
-
-        // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-        if (socketClient->sendData("list::app", 9) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send list app command");
-            return;
-        }
-
-        wxString filePath = saveFileDialog.GetPath();
-        socketClient->receiveAndSaveFile(filePath.ToStdString());
-
-        // Gửi đường dẫn đến file cho server
-        std::string path_command = "save_path:" + filePath.ToStdString();
-        socketClient->sendData(path_command.c_str(), path_command.length());
-
-        UpdateStatus("Applications list saved to " + filePath);
-        ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+    if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+        UpdateStatus("Operation cancelled: No save location selected");
+        return;
     }
 
-    void MainFrame::OnListProcess(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
-
-        wxFileDialog saveFileDialog(this, "Save Process List", "", "processes.txt",
-            "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-
-        if (saveFileDialog.ShowModal() == wxID_CANCEL) {
-            UpdateStatus("Operation cancelled: No save location selected");
-            return;
-        }
-
-        // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-        if (socketClient->sendData("list::process", 13) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send list process command");
-            return;
-        }
-
-        wxString filePath = saveFileDialog.GetPath();
-        socketClient->receiveAndSaveFile(filePath.ToStdString());
-
-        // Gửi đường dẫn đến file cho server
-        std::string path_command = "save_path:" + filePath.ToStdString();
-        socketClient->sendData(path_command.c_str(), path_command.length());
-
-        UpdateStatus("Process list saved to " + filePath);
-        ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+    // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
+    if (socketClient->sendData("list::app", 9) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send list app command");
+        return;
     }
 
-    void MainFrame::OnListService(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    wxString filePath = saveFileDialog.GetPath();
+    socketClient->receiveAndSaveFile(filePath.ToStdString());
 
-        wxFileDialog saveFileDialog(this, "Save Services List", "", "services.txt",
-            "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    // Gửi đường dẫn đến file cho server
+    std::string path_command = "save_path:" + filePath.ToStdString();
+    socketClient->sendData(path_command.c_str(), path_command.length());
 
-        if (saveFileDialog.ShowModal() == wxID_CANCEL) {
-            UpdateStatus("Operation cancelled: No save location selected");
-            return;
-        }
+    UpdateStatus("Applications list saved to " + filePath);
+    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+}
 
-        // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-        if (socketClient->sendData("list::service", 13) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send list service command");
-            return;
-        }
-
-        wxString filePath = saveFileDialog.GetPath();
-        socketClient->receiveAndSaveFile(filePath.ToStdString());
-
-        // Gửi đường dẫn đến file cho server
-        std::string path_command = "save_path:" + filePath.ToStdString();
-        socketClient->sendData(path_command.c_str(), path_command.length());
-
-        UpdateStatus("Services list saved to " + filePath);
-        ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+void MainFrame::OnListProcess(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
     }
 
-    void MainFrame::OnScreenshot(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    wxFileDialog saveFileDialog(this, "Save Process List", "", "processes.txt",
+        "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
-        wxFileDialog saveFileDialog(this, "Save Screenshot", "", "screenshot.png",
+    if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+        UpdateStatus("Operation cancelled: No save location selected");
+        return;
+    }
+
+    // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
+    if (socketClient->sendData("list::process", 13) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send list process command");
+        return;
+    }
+
+    wxString filePath = saveFileDialog.GetPath();
+    socketClient->receiveAndSaveFile(filePath.ToStdString());
+
+    // Gửi đường dẫn đến file cho server
+    std::string path_command = "save_path:" + filePath.ToStdString();
+    socketClient->sendData(path_command.c_str(), path_command.length());
+
+    UpdateStatus("Process list saved to " + filePath);
+    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+}
+
+void MainFrame::OnListService(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    wxFileDialog saveFileDialog(this, "Save Services List", "", "services.txt",
+        "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+        UpdateStatus("Operation cancelled: No save location selected");
+        return;
+    }
+
+    // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
+    if (socketClient->sendData("list::service", 13) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send list service command");
+        return;
+    }
+
+    wxString filePath = saveFileDialog.GetPath();
+    socketClient->receiveAndSaveFile(filePath.ToStdString());
+
+    // Gửi đường dẫn đến file cho server
+    std::string path_command = "save_path:" + filePath.ToStdString();
+    socketClient->sendData(path_command.c_str(), path_command.length());
+
+    UpdateStatus("Services list saved to " + filePath);
+    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+}
+
+void MainFrame::OnScreenshot(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    wxFileDialog saveFileDialog(this, "Save Screenshot", "", "screenshot.png",
+        "PNG files (*.png)|*.png", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+        UpdateStatus("Operation cancelled: No save location selected");
+        return;
+    }
+
+    // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
+    if (socketClient->sendData("screenshot::capture", 19) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send screenshot command");
+        return;
+    }
+
+    wxString filePath = saveFileDialog.GetPath();
+    socketClient->receiveAndSaveImage(filePath.ToStdString());
+
+    // Gửi đường dẫn đến file cho server
+    std::string path_command = "save_path:" + filePath.ToStdString();
+    socketClient->sendData(path_command.c_str(), path_command.length());
+
+    UpdateStatus("Screenshot saved to " + filePath);
+    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+}
+
+void MainFrame::OnOpenCam(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    wxButton* camButton = dynamic_cast<wxButton*>(FindWindow(ID_OPEN_CAM));
+
+    if (!isCameraOpen) {
+        wxFileDialog saveFileDialog(this, "Save Webcam Image", "", "webcam.png",
             "PNG files (*.png)|*.png", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
         if (saveFileDialog.ShowModal() == wxID_CANCEL) {
@@ -1080,8 +1194,8 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         }
 
         // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-        if (socketClient->sendData("screenshot::capture", 19) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send screenshot command");
+        if (socketClient->sendData("camera::open", 12) == SOCKET_ERROR) {
+            UpdateStatus("Failed to send open cam command");
             return;
         }
 
@@ -1092,261 +1206,225 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         std::string path_command = "save_path:" + filePath.ToStdString();
         socketClient->sendData(path_command.c_str(), path_command.length());
 
-        UpdateStatus("Screenshot saved to " + filePath);
+        UpdateStatus("Webcam image saved to " + filePath);
         ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+
+        if (camButton) {
+            camButton->SetLabel("Close Camera");
+        }
+        isCameraOpen = true;
+    }
+    else {
+        // Camera close không cần save file
+        if (socketClient->sendData("camera::close", 13) == SOCKET_ERROR) {
+            UpdateStatus("Failed to send close cam command");
+            return;
+        }
+
+        if (camButton) {
+            camButton->SetLabel("Open Camera");
+        }
+        isCameraOpen = false;
+        UpdateStatus("Camera closed successfully");
+    }
+}
+
+void MainFrame::OnHelp(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
     }
 
-    void MainFrame::OnOpenCam(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    wxFileDialog saveFileDialog(this, "Save Help Information", "", "help.txt",
+        "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
-        wxButton* camButton = dynamic_cast<wxButton*>(FindWindow(ID_OPEN_CAM));
-
-        if (!isCameraOpen) {
-            wxFileDialog saveFileDialog(this, "Save Webcam Image", "", "webcam.png",
-                "PNG files (*.png)|*.png", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-
-            if (saveFileDialog.ShowModal() == wxID_CANCEL) {
-                UpdateStatus("Operation cancelled: No save location selected");
-                return;
-            }
-
-            // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-            if (socketClient->sendData("camera::open", 12) == SOCKET_ERROR) {
-                UpdateStatus("Failed to send open cam command");
-                return;
-            }
-
-            wxString filePath = saveFileDialog.GetPath();
-            socketClient->receiveAndSaveImage(filePath.ToStdString());
-
-            // Gửi đường dẫn đến file cho server
-            std::string path_command = "save_path:" + filePath.ToStdString();
-            socketClient->sendData(path_command.c_str(), path_command.length());
-
-            UpdateStatus("Webcam image saved to " + filePath);
-            ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
-
-            if (camButton) {
-                camButton->SetLabel("Close Camera");
-            }
-            isCameraOpen = true;
-        }
-        else {
-            // Camera close không cần save file
-            if (socketClient->sendData("camera::close", 13) == SOCKET_ERROR) {
-                UpdateStatus("Failed to send close cam command");
-                return;
-            }
-
-            if (camButton) {
-                camButton->SetLabel("Open Camera");
-            }
-            isCameraOpen = false;
-            UpdateStatus("Camera closed successfully");
-        }
+    if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+        UpdateStatus("Operation cancelled: No save location selected");
+        return;
     }
 
-    void MainFrame::OnHelp(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
-
-        wxFileDialog saveFileDialog(this, "Save Help Information", "", "help.txt",
-            "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-
-        if (saveFileDialog.ShowModal() == wxID_CANCEL) {
-            UpdateStatus("Operation cancelled: No save location selected");
-            return;
-        }
-
-        // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
-        if (socketClient->sendData("help::cmd", 9) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send help command");
-            return;
-        }
-
-        wxString filePath = saveFileDialog.GetPath();
-        socketClient->receiveAndSaveFile(filePath.ToStdString());
-
-        // Gửi đường dẫn đến file cho server
-        std::string path_command = "save_path:" + filePath.ToStdString();
-        socketClient->sendData(path_command.c_str(), path_command.length());
-
-        UpdateStatus("Help information saved to " + filePath);
-        ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+    // Chỉ gửi command sau khi người dùng đã chọn nơi lưu file
+    if (socketClient->sendData("help::cmd", 9) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send help command");
+        return;
     }
 
-    void MainFrame::OnToggleApp(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    wxString filePath = saveFileDialog.GetPath();
+    socketClient->receiveAndSaveFile(filePath.ToStdString());
 
-        wxButton* toggleButton = dynamic_cast<wxButton*>(FindWindow(ID_TOGGLE_APP));
+    // Gửi đường dẫn đến file cho server
+    std::string path_command = "save_path:" + filePath.ToStdString();
+    socketClient->sendData(path_command.c_str(), path_command.length());
 
-        if (!isAppRunning) {
-            // Starting application
-            wxTextEntryDialog dialog(
-                this,
-                "Enter process name:",
-                "Process Manager",
-                "",
-                wxOK | wxCANCEL | wxCENTRE
-            );
+    UpdateStatus("Help information saved to " + filePath);
+    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
+}
 
-            if (dialog.ShowModal() == wxID_OK) {
-                wxString appName = dialog.GetValue();
-                currentAppName = appName;
+void MainFrame::OnToggleApp(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
 
-                // Gửi lệnh start_app tới server
-                std::string command = "app::start " + appName.ToStdString();
-                if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
-                    UpdateStatus("Failed to send start app command");
-                    return;
-                }
+    wxButton* toggleButton = dynamic_cast<wxButton*>(FindWindow(ID_TOGGLE_APP));
 
-                isAppRunning = true;
-                if (toggleButton) {
-                    toggleButton->SetLabel("Stop App");
-                }
-                UpdateStatus("Start application command sent for: " + appName);
-            }
-        }
-        else {
-            // Gửi lệnh stop_app kèm tên ứng dụng tới server
-            std::string command = "app::stop " + currentAppName.ToStdString();
+    if (!isAppRunning) {
+        // Starting application
+        wxTextEntryDialog dialog(
+            this,
+            "Enter process name:",
+            "Process Manager",
+            "",
+            wxOK | wxCANCEL | wxCENTRE
+        );
+
+        if (dialog.ShowModal() == wxID_OK) {
+            wxString appName = dialog.GetValue();
+            currentAppName = appName;
+
+            // Gửi lệnh start_app tới server
+            std::string command = "app::start " + appName.ToStdString();
             if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
-                UpdateStatus("Failed to send stop app command");
+                UpdateStatus("Failed to send start app command");
                 return;
             }
 
-            isAppRunning = false;
+            isAppRunning = true;
             if (toggleButton) {
-                toggleButton->SetLabel("Start App");
+                toggleButton->SetLabel("Stop App");
             }
-            UpdateStatus("Stop application command sent for: " + currentAppName);
+            UpdateStatus("Start application command sent for: " + appName);
         }
     }
-
-    void MainFrame::OnShutdown(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
+    else {
+        // Gửi lệnh stop_app kèm tên ứng dụng tới server
+        std::string command = "app::stop " + currentAppName.ToStdString();
+        if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
+            UpdateStatus("Failed to send stop app command");
             return;
         }
 
-        if (socketClient->sendData("system::shutdown", 16) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send shutdown command");
-            return;
+        isAppRunning = false;
+        if (toggleButton) {
+            toggleButton->SetLabel("Start App");
         }
-        UpdateStatus("Shutdown command sent successfully");
+        UpdateStatus("Stop application command sent for: " + currentAppName);
+    }
+}
+
+void MainFrame::OnShutdown(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
     }
 
-    void MainFrame::OnRestart(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
+    if (socketClient->sendData("system::shutdown", 16) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send shutdown command");
+        return;
+    }
+    UpdateStatus("Shutdown command sent successfully");
+}
+
+void MainFrame::OnRestart(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    if (socketClient->sendData("system::restart", 15) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send restart command");
+        return;
+    }
+    UpdateStatus("Restart command sent successfully");
+}
+
+void MainFrame::OnLockScreen(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    if (socketClient->sendData("system::lock", 12) == SOCKET_ERROR) {
+        UpdateStatus("Failed to send lock screen command");
+        return;
+    }
+    UpdateStatus("Lock screen command sent successfully");
+}
+
+void MainFrame::LoadClientSecrets() {
+    try {
+        std::ifstream file("client_secret.json");
+        if (!file.is_open()) {
+            UpdateStatus("Error: Unable to open client_secret.json");
             return;
         }
 
-        if (socketClient->sendData("system::restart", 15) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send restart command");
+        Json::Value root;
+        file >> root;
+        file.close();
+
+        clientId = root["web"]["client_id"].asString();
+        clientSecret = root["web"]["client_secret"].asString();
+
+        if (clientId.empty() || clientSecret.empty()) {
+            UpdateStatus("Error: Invalid client_secret.json format");
             return;
         }
-        UpdateStatus("Restart command sent successfully");
+
+        UpdateStatus("Client secrets loaded successfully");
+    }
+    catch (const std::exception& e) {
+        UpdateStatus(wxString::Format("Error loading client secrets: %s", e.what()));
+    }
+}
+
+
+// And here's the corrected UpdateStatus method:
+void MainFrame::UpdateStatus(const wxString& message) {
+    wxDateTime now = wxDateTime::Now();
+    wxString timestamp = now.FormatTime();
+
+    wxFont teletype(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
+
+    wxTextAttr timestampStyle;
+    timestampStyle.SetTextColour(wxColour(128, 128, 128));
+    timestampStyle.SetFont(teletype);
+
+    wxTextAttr messageStyle;
+    wxString prefix;
+    wxString loweredMsg = message.Lower();
+
+    if (loweredMsg.Contains("error") || loweredMsg.Contains("failed") ||
+        loweredMsg.Contains("unable") || loweredMsg.Contains("invalid")) {
+        messageStyle.SetTextColour(wxColour(255, 99, 71));
+        prefix = "ERROR";
+    }
+    else if (loweredMsg.Contains("success") || loweredMsg.Contains("connected") ||
+        loweredMsg.Contains("authenticated") || loweredMsg.Contains("saved")) {
+        messageStyle.SetTextColour(wxColour(46, 204, 113));
+        prefix = "SUCCESS";
+    }
+    else if (loweredMsg.Contains("warning")) {
+        messageStyle.SetTextColour(wxColour(241, 196, 15));
+        prefix = "WARNING";
+    }
+    else {
+        messageStyle.SetTextColour(wxColour(189, 195, 199));
+        prefix = "INFO";
     }
 
-    void MainFrame::OnLockScreen(wxCommandEvent& event) {
-        if (!socketClient->isConnected()) {
-            UpdateStatus("Error: Not connected to server");
-            return;
-        }
+    txtStatus->SetDefaultStyle(timestampStyle);
+    txtStatus->AppendText("[" + timestamp + "] ");
 
-        if (socketClient->sendData("system::lock", 12) == SOCKET_ERROR) {
-            UpdateStatus("Failed to send lock screen command");
-            return;
-        }
-        UpdateStatus("Lock screen command sent successfully");
-    }
+    teletype.SetWeight(wxFONTWEIGHT_BOLD);
+    messageStyle.SetFont(teletype);
+    txtStatus->SetDefaultStyle(messageStyle);
+    txtStatus->AppendText("[" + prefix + "] ");
 
-    void MainFrame::LoadClientSecrets() {
-        try {
-            std::ifstream file("client_secret.json");
-            if (!file.is_open()) {
-                UpdateStatus("Error: Unable to open client_secret.json");
-                return;
-            }
+    teletype.SetWeight(wxFONTWEIGHT_NORMAL);
+    messageStyle.SetFont(teletype);
+    txtStatus->SetDefaultStyle(messageStyle);
+    txtStatus->AppendText(message + "\n");
 
-            Json::Value root;
-            file >> root;
-            file.close();
-
-            clientId = root["web"]["client_id"].asString();
-            clientSecret = root["web"]["client_secret"].asString();
-
-            if (clientId.empty() || clientSecret.empty()) {
-                UpdateStatus("Error: Invalid client_secret.json format");
-                return;
-            }
-
-            UpdateStatus("Client secrets loaded successfully");
-        }
-        catch (const std::exception& e) {
-            UpdateStatus(wxString::Format("Error loading client secrets: %s", e.what()));
-        }
-    }
-
-
-    // And here's the corrected UpdateStatus method:
-    void MainFrame::UpdateStatus(const wxString& message) {
-        wxDateTime now = wxDateTime::Now();
-        wxString timestamp = now.FormatTime();
-
-        wxFont teletype(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
-
-        wxTextAttr timestampStyle;
-        timestampStyle.SetTextColour(wxColour(128, 128, 128));
-        timestampStyle.SetFont(teletype);
-
-        wxTextAttr messageStyle;
-        wxString prefix;
-        wxString loweredMsg = message.Lower();
-
-        if (loweredMsg.Contains("error") || loweredMsg.Contains("failed") ||
-            loweredMsg.Contains("unable") || loweredMsg.Contains("invalid")) {
-            messageStyle.SetTextColour(wxColour(255, 99, 71));
-            prefix = "ERROR";
-        }
-        else if (loweredMsg.Contains("success") || loweredMsg.Contains("connected") ||
-            loweredMsg.Contains("authenticated") || loweredMsg.Contains("saved")) {
-            messageStyle.SetTextColour(wxColour(46, 204, 113));
-            prefix = "SUCCESS";
-        }
-        else if (loweredMsg.Contains("warning")) {
-            messageStyle.SetTextColour(wxColour(241, 196, 15));
-            prefix = "WARNING";
-        }
-        else {
-            messageStyle.SetTextColour(wxColour(189, 195, 199));
-            prefix = "INFO";
-        }
-
-        txtStatus->SetDefaultStyle(timestampStyle);
-        txtStatus->AppendText("[" + timestamp + "] ");
-
-        teletype.SetWeight(wxFONTWEIGHT_BOLD);
-        messageStyle.SetFont(teletype);
-        txtStatus->SetDefaultStyle(messageStyle);
-        txtStatus->AppendText("[" + prefix + "] ");
-
-        teletype.SetWeight(wxFONTWEIGHT_NORMAL);
-        messageStyle.SetFont(teletype);
-        txtStatus->SetDefaultStyle(messageStyle);
-        txtStatus->AppendText(message + "\n");
-
-        txtStatus->ShowPosition(txtStatus->GetLastPosition());
-    }
-
-    
+    txtStatus->ShowPosition(txtStatus->GetLastPosition());
+}

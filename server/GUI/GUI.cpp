@@ -413,11 +413,16 @@ void ServerFrame::LogMessage(const wxString& message, const wxString& details, b
         style.SetTextColour(wxColour(255, 99, 71));  // Đỏ
         prefix = "ERROR";
     }
-    else if (loweredMsg.Contains("success") || loweredMsg.Contains("sent") || loweredMsg.Contains("deleted") ||
+    else if (loweredMsg.Contains("success") || loweredMsg.Contains("sent") || loweredMsg.Contains("deleted") || 
+        loweredMsg.Contains("starting") ||
         loweredMsg.Contains("complete") || loweredMsg.Contains("saved")) {
         style.SetTextColour(wxColour(46, 204, 113));  // Xanh lá
         prefix = "SUCCESS";
     }
+    else if (loweredMsg.Contains("::")) {
+        style.SetTextColour(wxColour(135, 206, 235));
+        prefix = "COMMAND";
+    }    
     else if (loweredMsg.Contains("warning")) {
         style.SetTextColour(wxColour(241, 196, 15));  // Vàng
         prefix = "WARNING";
@@ -528,7 +533,7 @@ void ServerFrame::OnLogEvent(wxCommandEvent& event)
         wxString status = "Executed";
         wxColour itemColor = wxColour(46, 204, 113); // Màu xanh mặc định
 
-        if (entry->message.StartsWith("error") || entry->message.StartsWith("Error")) {
+        if (entry->message.StartsWith("error") || entry->message.StartsWith("Error") || entry->message.StartsWith("ERROR") || entry->message.StartsWith("INVALID")) {
             status = "Failed";
             itemColor = wxColour(231, 76, 60); // Màu đỏ cho lỗi
         }

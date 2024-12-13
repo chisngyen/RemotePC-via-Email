@@ -901,7 +901,7 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                 command.substr(0, 12) == "file::delete";
 
             if (!isValidCommand) {
-                std::string errorCommand = "error::Invalid command: " + command;
+                std::string errorCommand = "INVALID COMMAND: " + command;
                 socketClient->sendData(errorCommand.c_str(), errorCommand.length());
                 UpdateCommandsList("[ERROR] '" + command + "'", emailInfo);
                 commandResult += "Invalid command\n";

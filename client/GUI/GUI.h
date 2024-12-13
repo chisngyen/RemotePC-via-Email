@@ -58,7 +58,7 @@ public:
         const wxColour& headerColor)
         : wxDialog(parent, wxID_ANY, title,
             position, wxDefaultSize,
-            wxBORDER_NONE | wxSTAY_ON_TOP)
+            wxBORDER_NONE)
     {
         SetBackgroundColour(wxColour(45, 49, 58));
 

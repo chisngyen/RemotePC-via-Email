@@ -5,6 +5,8 @@
 #include <fstream>
 #include "GmailAPI.h"
 #include <iostream>
+#include <ShlObj.h>
+#include <KnownFolders.h>
 
 class TokenManager {
 public:
@@ -15,8 +17,31 @@ public:
     void removeToken(const std::string& gmail);
 
 private:
+    std::string getTokenFilePath() {
+        PWSTR appDataPath = nullptr;
+        std::string tokenPath;
+
+        // Get the AppData\Roaming path
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appDataPath))) {
+            std::wstring widePath(appDataPath);
+            std::string path(widePath.begin(), widePath.end());
+
+            // Create application directory if it doesn't exist
+            std::string appDir = path + "\\EmailPCControl";
+            CreateDirectoryA(appDir.c_str(), nullptr);
+
+            // Set the full path for tokens.json
+            tokenPath = appDir + "\\tokens.json";
+            CoTaskMemFree(appDataPath);
+        }
+
+        return tokenPath;
+    }
+
     std::map<std::string, std::string> tokenStore;
-    const std::string TOKEN_FILE = "tokens.json";
+    std::string TOKEN_FILE;
     void loadTokens();
     void saveTokens();
+
+    
 };

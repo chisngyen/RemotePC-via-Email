@@ -106,6 +106,7 @@ void LoginFrame::LoadSavedGmails()
 {
     // Danh sách Gmail mẫu
     wxArrayString savedGmails;
+    savedGmails.Add("mangmaytinhk23@gmail.com");
     savedGmails.Add("nguyentngu111@gmail.com");
     savedGmails.Add("tcnguyen2365@gmail.com");
     savedGmails.Add("chisboiz111@gmail.com");

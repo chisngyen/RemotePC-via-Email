@@ -1080,7 +1080,6 @@ void MainFrame::OnListApp(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Applications list saved to " + filePath);
-    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 }
 
 void MainFrame::OnListProcess(wxCommandEvent& event) {
@@ -1111,7 +1110,6 @@ void MainFrame::OnListProcess(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Process list saved to " + filePath);
-    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 }
 
 void MainFrame::OnListService(wxCommandEvent& event) {
@@ -1142,7 +1140,6 @@ void MainFrame::OnListService(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Services list saved to " + filePath);
-    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 }
 
 void MainFrame::OnScreenshot(wxCommandEvent& event) {
@@ -1173,7 +1170,6 @@ void MainFrame::OnScreenshot(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Screenshot saved to " + filePath);
-    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 }
 
 void MainFrame::OnOpenCam(wxCommandEvent& event) {
@@ -1207,7 +1203,6 @@ void MainFrame::OnOpenCam(wxCommandEvent& event) {
         socketClient->sendData(path_command.c_str(), path_command.length());
 
         UpdateStatus("Webcam image saved to " + filePath);
-        ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 
         if (camButton) {
             camButton->SetLabel("Close Camera");
@@ -1257,7 +1252,6 @@ void MainFrame::OnHelp(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Help information saved to " + filePath);
-    ShellExecuteA(NULL, "open", filePath.c_str(), NULL, NULL, SW_SHOW);
 }
 
 void MainFrame::OnToggleApp(wxCommandEvent& event) {

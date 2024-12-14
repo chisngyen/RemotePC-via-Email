@@ -221,9 +221,23 @@ void ServerFrame::OnLogItemDblClick(wxListEvent& event) {
     if (index >= 0 && static_cast<size_t>(index) < logEntries.size()) {
         const LogEntry& entry = logEntries[index];
 
-        // N?u có ???ng d?n ?ã l?u thì m? file
-        if (!entry.savedPath.IsEmpty()) {
-            wxLaunchDefaultApplication(entry.savedPath);
+        // Get the command text
+        wxString commandText = logList->GetItemText(index, 1);
+
+        if (entry.isImage && !entry.imageData.empty()) {
+            // Show image dialog
+            ImageDialog dialog(this, "Image - " + commandText, entry.imageData);
+            dialog.ShowModal();
+        }
+        else if (!entry.content.IsEmpty()) {
+            // Show content dialog for text content
+            ContentDialog dialog(this, "Command Details - " + commandText, entry.content);
+            dialog.ShowModal();
+        }
+        else {
+            ContentDialog dialog(this, "Command Details - " + commandText,
+                "No content available for this command.");
+            dialog.ShowModal();
         }
     }
 }
@@ -318,27 +332,48 @@ void ServerFrame::ServerLoop() {
                 response = cmd.Applist();
                 server->sendMessage(response);
                 LogMessage("Sent application list", response, false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().content = response;
+                }
             }
             else if (command == "list::service") {
                 response = cmd.Listservice();
                 server->sendMessage(response);
                 LogMessage("Sent service list", response, false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().content = response;
+                }
             }
             else if (command == "list::process") {
                 response = cmd.Listprocess();
                 server->sendMessage(response);
                 LogMessage("Sent process list", response, false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().content = response;
+                }
             }
             else if (command == "help::cmd") {
                 response = cmd.help();
                 server->sendMessage(response);
                 LogMessage("Sent help information", response, false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().content = response;
+                }
             }
             else if (command == "screenshot::capture") {
                 int width, height;
                 imageData = cmd.captureScreenWithGDIPlus(width, height);
                 cmd.sendImage(server->getClientSocket(), imageData);
                 LogMessage("Sent screenshot", "Screenshot taken", false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().imageData = imageData;
+                    logEntries.back().isImage = true;
+                }
             }
             else if (command == "system::shutdown") {
                 LogMessage("Executing shutdown command", "", false);
@@ -351,6 +386,11 @@ void ServerFrame::ServerLoop() {
                 imageData = cmd.captureScreenWithGDIPlus(width, height);
                 cmd.sendImage(server->getClientSocket(), imageData);
                 LogMessage("Camera capture taken", "", false);
+
+                if (!logEntries.empty()) {
+                    logEntries.back().imageData = imageData;
+                    logEntries.back().isImage = true;
+                }
             }
             else if (command == "camera::close") {
                 cmd.closeCamera();
@@ -399,6 +439,7 @@ void ServerFrame::ServerLoop() {
 
 void ServerFrame::LogMessage(const wxString& message, const wxString& details, bool isCommand) {
     LogEntry* entry = new LogEntry{ message, details, isCommand };
+    entry->isImage = false;
 
     wxDateTime now = wxDateTime::Now();
     wxString timestamp = now.FormatTime();

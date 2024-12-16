@@ -18,7 +18,7 @@ EVT_BUTTON(1003, ServerFrame::OnClearHistory)
 END_EVENT_TABLE()
 
 ServerFrame::ServerFrame(const wxString& title)
-    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1200, 1000))
+    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 800))
 {
     // Create main panel with modern dark theme
     wxPanel* panel = new wxPanel(this);
@@ -224,7 +224,12 @@ void ServerFrame::OnLogItemDblClick(wxListEvent& event) {
         // Get the command text
         wxString commandText = logList->GetItemText(index, 1);
 
-        if (entry.isImage && !entry.imageData.empty()) {
+        if (entry.isVideo && !entry.imageData.empty()) {
+            // Show video dialog
+            VideoDialog dialog(this, "Video - " + commandText, entry.imageData);
+            dialog.ShowModal();
+        }
+        else if (entry.isImage && !entry.imageData.empty()) {
             // Show image dialog
             ImageDialog dialog(this, "Image - " + commandText, entry.imageData);
             dialog.ShowModal();
@@ -430,6 +435,38 @@ void ServerFrame::ServerLoop() {
                 cmd.handleDeleteFile(server->getClientSocket(), filepath);
                 LogMessage("Deleted file: " + filepath, "", false);
             }
+            else if (command.substr(0, 14) == "camera::record") {
+                try {
+                    string durationStr = command.substr(14);
+                    int seconds = std::stoi(durationStr);
+
+                    if (seconds <= 0 || seconds > 300) {
+                        LogMessage("Error: Invalid recording duration", "", false);
+                        continue;
+                    }
+
+                    LogMessage("Opening camera and starting recording...", "", false);
+
+                    // Gọi hàm record từ Command class (đã bao gồm việc mở/đóng camera)
+                    vector<BYTE> videoData = cmd.recordVideo(seconds);
+
+                    // Gửi dữ liệu về client
+                    cmd.sendImage(server->getClientSocket(), videoData);
+
+                    LogMessage("Video recording completed and sent", "", false);
+
+                    if (!logEntries.empty()) {
+                        logEntries.back().imageData = videoData;
+                        logEntries.back().isVideo = true;  // Set the video flag
+                        logEntries.back().isImage = false; // Make sure image flag is false
+                        logEntries.back().content = "Video recording: " + to_string(videoData.size()) + " bytes";
+                    }
+                }
+                catch (const std::exception& e) {
+                    cmd.closeCamera(); // Ensure camera is closed in case of error
+                    LogMessage("Error in video recording: " + string(e.what()), "", false);
+                }
+                }
             
         }
 
@@ -540,6 +577,9 @@ void ServerFrame::FormatCommand(wxString& command) {
     }
     else if (command == "camera::close") {
         command = "CLOSE CAMERA";
+    }
+    else if (command.StartsWith("camera::record")) {
+        command = "RECORD: " + command.Mid(14).Upper() + " SECONDS";
     }
     else if (command == "help::cmd") {
         command = "HELP COMMAND";

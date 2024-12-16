@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <iostream>
 #include <string>
@@ -12,6 +12,7 @@
 #include <gdiplus.h>
 #include <thread>
 #include <chrono>
+#include <opencv2/opencv.hpp>
 
 
 // Add these pragma comments
@@ -62,6 +63,7 @@ public:
     // Camera commands
     void openCamera();
     void closeCamera();
+    vector<BYTE> recordVideo(int seconds);
 
     // System commands
     void shutdownComputer();
@@ -80,3 +82,4 @@ public:
     void stopApplication(const string& appName);
 
 };
+

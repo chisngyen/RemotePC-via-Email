@@ -417,3 +417,88 @@ void Command::stopApplication(const string& appName) {
         cout << "Could not find or terminate " << appName << endl;
     }
 }
+
+std::vector<BYTE> Command::recordVideo(int seconds) {
+    std::cout << "Starting video recording..." << std::endl;
+
+    // Mở camera
+    cv::VideoCapture cap(0); // Mở camera mặc định
+    if (!cap.isOpened()) {
+        throw std::runtime_error("Error: Could not open the camera.");
+    }
+
+    // Lấy FPS và kích thước khung hình của camera
+    double fps = cap.get(cv::CAP_PROP_FPS);
+    if (fps <= 0) fps = 30.0; // Nếu không lấy được FPS thì set mặc định là 30
+    int frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    int frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+
+    std::cout << "Camera FPS: " << fps << std::endl;
+    std::cout << "Resolution: " << frame_width << "x" << frame_height << std::endl;
+
+    // Tạo file lưu video
+    cv::VideoWriter video("webcam_recording.avi",
+        cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
+        fps,
+        cv::Size(frame_width, frame_height));
+
+    if (!video.isOpened()) {
+        cap.release();
+        throw std::runtime_error("Error: Could not create video writer.");
+    }
+
+    std::cout << "Recording started..." << std::endl;
+
+    auto start_time = std::chrono::steady_clock::now();
+
+    // Ghi video trong vòng thời gian yêu cầu
+    while (true) {
+        cv::Mat frame;
+        cap >> frame; // Đọc khung hình từ camera
+
+        if (frame.empty()) {
+            std::cout << "Error: Could not read frame from camera." << std::endl;
+            break;
+        }
+
+        // Ghi frame vào file video
+        video.write(frame);
+
+        // Hiển thị video trực tiếp
+        cv::imshow("Recording", frame);
+
+        // Kiểm tra thời gian đã ghi
+        auto current_time = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count();
+
+        if (elapsed >= seconds || cv::waitKey(1) == 'q') { // Nếu đã đủ thời gian hoặc nhấn 'q' thì dừng
+            break;
+        }
+    }
+
+    std::cout << "\nRecording finished." << std::endl;
+
+    // Giải phóng tài nguyên
+    cap.release();
+    video.release();
+    cv::destroyAllWindows();
+
+    // Kiểm tra file ghi
+    std::ifstream checkFile("webcam_recording.avi", std::ios::binary | std::ios::ate);
+    if (!checkFile) {
+        throw std::runtime_error("Cannot open recorded file.");
+    }
+
+    std::streamsize fileSize = checkFile.tellg();
+    std::cout << "Recorded file size: " << fileSize << " bytes" << std::endl;
+    checkFile.close();
+
+    // Đọc dữ liệu video vào buffer
+    std::ifstream videoFile("webcam_recording.avi", std::ios::binary);
+    std::vector<BYTE> buffer(std::istreambuf_iterator<char>(videoFile), {});
+    videoFile.close();
+
+    std::cout << "Successfully read " << buffer.size() << " bytes of video data" << std::endl;
+
+    return buffer;
+}

@@ -97,6 +97,32 @@ void SocketClient::receiveAndSaveFile(const string& filename) {
     saveToFile(filename, data);
 }
 
+void SocketClient::receiveVideoData(const string& filename) {
+    if (clientSocket == INVALID_SOCKET) return;
+
+    int dataSize;
+    if (recv(clientSocket, (char*)&dataSize, sizeof(dataSize), 0) != sizeof(dataSize)) {
+        cerr << "Error receiving video data size." << endl;
+        return;
+    }
+
+    string data;
+    char buffer[BUFFER_SIZE];
+    int bytesReceived;
+    int totalBytesReceived = 0;
+    while (totalBytesReceived < dataSize) {
+        bytesReceived = recv(clientSocket, buffer, min(BUFFER_SIZE, dataSize - totalBytesReceived), 0);
+        if (bytesReceived <= 0) {
+            cerr << "Error receiving video data." << endl;
+            return;
+        }
+        data.append(buffer, bytesReceived);
+        totalBytesReceived += bytesReceived;
+    }
+
+    saveToFile(filename, data);
+}
+
 void SocketClient::receiveAndSaveImage(const string& filename) {
     if (clientSocket == INVALID_SOCKET) return;
 

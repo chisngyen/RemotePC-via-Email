@@ -5,6 +5,8 @@
 #include <wx/timer.h>
 #include <wx/filedlg.h>
 #include <wx/artprov.h>
+#include <wx/stdpaths.h>
+#include <wx/filename.h>
 
 // Custom includes
 #include "socket.h"
@@ -12,6 +14,7 @@
 #include "TokenManager.h"
 #include "handleMail.h"
 #include "OAuthServer.h"
+#include <Windows.h>
 
 // Constants
 #define REDIRECT_URI "http://localhost"
@@ -33,7 +36,8 @@ enum {
     ID_RESTART,
     ID_LOCKSCREEN,
     ID_TOGGLE_APP,
-    ID_LOGOUT
+    ID_LOGOUT,
+    ID_RECORD_CAM = wxID_HIGHEST + 100
 };
 
 // Data structures
@@ -104,6 +108,7 @@ public:
                 else if (cmd == "Services List") commandId = ID_LIST_SERVICE;
                 else if (cmd == "Take Screenshot") commandId = ID_SCREENSHOT;
                 else if (cmd == "Camera Control") commandId = ID_OPEN_CAM;
+                else if (cmd == "Record Video") commandId = ID_RECORD_CAM;
                 else if (cmd == "Shutdown") commandId = ID_SHUTDOWN;
                 else if (cmd == "Restart") commandId = ID_RESTART;
                 else if (cmd == "Lock Screen") commandId = ID_LOCKSCREEN;
@@ -210,6 +215,7 @@ private:
     void OnListService(wxCommandEvent& event);
     void OnScreenshot(wxCommandEvent& event);
     void OnOpenCam(wxCommandEvent& event);
+    void OnRecordCam(wxCommandEvent& event);
     void OnHelp(wxCommandEvent& event);
     void OnShutdown(wxCommandEvent& event);
     void OnRestart(wxCommandEvent& event);

@@ -17,6 +17,7 @@ EVT_BUTTON(ID_LIST_SERVICE, MainFrame::OnListService)
 EVT_BUTTON(ID_SCREENSHOT, MainFrame::OnScreenshot)
 EVT_BUTTON(ID_OPEN_CAM, MainFrame::OnOpenCam)
 EVT_BUTTON(ID_HELP, MainFrame::OnHelp)
+EVT_BUTTON(ID_RECORD_CAM, MainFrame::OnRecordCam)
 EVT_BUTTON(ID_SHUTDOWN, MainFrame::OnShutdown)
 EVT_BUTTON(ID_RESTART, MainFrame::OnRestart)
 EVT_BUTTON(ID_LOCKSCREEN, MainFrame::OnLockScreen)
@@ -26,7 +27,7 @@ EVT_CLOSE(MainFrame::OnClose)
 END_EVENT_TABLE()
 
 MainFrame::MainFrame(const wxString& title)
-    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1200, 1000))
+    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 800))
 {
     // Initialize members
     socketClient = new SocketClient();
@@ -250,6 +251,7 @@ MainFrame::MainFrame(const wxString& title)
                 else if (label == "Monitoring") {
                     commands.Add("Take Screenshot");
                     commands.Add("Camera Control");
+                    commands.Add("Record Video");
                 }
                 else if (label == "System Control") {
                     commands.Add("Shutdown");
@@ -862,7 +864,7 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
 
         // Tách các lệnh bằng dấu chấm phẩy
         std::vector<std::string> commands;
-        std::vector<std::string> attachments; // Lưu tất cả các file đính kèm
+        std::vector<std::string> attachments;
         size_t pos = 0;
         std::string delimiter = ";";
         std::string commandsRemaining = commandsStr;
@@ -878,15 +880,24 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             commands.push_back(trim(commandsRemaining));
         }
 
-        // Tạo string để lưu thông tin chi tiết cho email reply
+        // Lấy đường dẫn AppData\Roaming\[AppName]
+        wxString appDataDir = wxStandardPaths::Get().GetUserDataDir();
+        if (!wxDirExists(appDataDir)) {
+            wxMkdir(appDataDir);
+        }
+
+        // Tạo thư mục temp trong AppData
+        wxString tempDir = appDataDir + wxFILE_SEP_PATH + "temp";
+        if (!wxDirExists(tempDir)) {
+            wxMkdir(tempDir);
+        }
+
         std::string replyMessage = "This is an automated reply to your email.\nProcessed commands:\n";
 
-        // Xử lý từng lệnh
         for (const std::string& command : commands) {
             UpdateStatus("Processing command: " + command);
             std::string commandResult = "- " + command + ": ";
 
-            // Kiểm tra tính hợp lệ của lệnh
             bool isValidCommand =
                 command == "list::app" ||
                 command == "list::service" ||
@@ -895,13 +906,14 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                 command == "screenshot::capture" ||
                 command == "camera::open" ||
                 command == "camera::close" ||
+                command.substr(0, 14) == "camera::record" ||
                 command.substr(0, 10) == "app::start" ||
                 command.substr(0, 9) == "app::stop" ||
                 command.substr(0, 9) == "file::get" ||
                 command.substr(0, 12) == "file::delete";
 
             if (!isValidCommand) {
-                std::string errorCommand = "INVALID COMMAND: " + command;
+                std::string errorCommand = "error::Invalid command: " + command;
                 socketClient->sendData(errorCommand.c_str(), errorCommand.length());
                 UpdateCommandsList("[ERROR] '" + command + "'", emailInfo);
                 commandResult += "Invalid command\n";
@@ -909,7 +921,6 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                 continue;
             }
 
-            // Gửi lệnh tới server
             if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
                 UpdateStatus("Failed to send command to server: " + command);
                 commandResult += "Failed to send command\n";
@@ -921,36 +932,26 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             std::string filename = "";
 
             try {
-                // Xử lý các loại lệnh khác nhau
                 if (command == "list::app" || command == "list::service") {
                     filename = (command == "list::app") ? "applications.txt" : "services.txt";
-                    socketClient->receiveAndSaveFile(filename);
-                    if (!filename.empty()) {
-                        wxString currentDir = wxGetCwd();
-                        wxString filePath = wxFileName(currentDir, filename).GetFullPath();
-                        attachments.push_back(filePath.ToStdString());
-                        commandResult += "Generated " + filename + "\n";
-                    }
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    socketClient->receiveAndSaveFile(fullPath.ToStdString());
+                    attachments.push_back(fullPath.ToStdString());
+                    commandResult += "Generated " + filename + "\n";
                 }
                 else if (command == "list::process" || command == "help::cmd") {
                     filename = (command == "list::process") ? "processes.txt" : "help.txt";
-                    socketClient->receiveAndSaveFile(filename);
-                    if (!filename.empty()) {
-                        wxString currentDir = wxGetCwd();
-                        wxString filePath = wxFileName(currentDir, filename).GetFullPath();
-                        attachments.push_back(filePath.ToStdString());
-                        commandResult += "Generated " + filename + "\n";
-                    }
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    socketClient->receiveAndSaveFile(fullPath.ToStdString());
+                    attachments.push_back(fullPath.ToStdString());
+                    commandResult += "Generated " + filename + "\n";
                 }
                 else if (command == "screenshot::capture" || command == "camera::open") {
                     filename = (command == "screenshot::capture") ? "screenshot.png" : "webcam.png";
-                    socketClient->receiveAndSaveImage(filename);
-                    if (!filename.empty()) {
-                        wxString currentDir = wxGetCwd();
-                        wxString filePath = wxFileName(currentDir, filename).GetFullPath();
-                        attachments.push_back(filePath.ToStdString());
-                        commandResult += "Generated " + filename + "\n";
-                    }
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    socketClient->receiveAndSaveImage(fullPath.ToStdString());
+                    attachments.push_back(fullPath.ToStdString());
+                    commandResult += "Generated " + filename + "\n";
 
                     if (command == "camera::open") {
                         isCameraOpen = true;
@@ -958,7 +959,6 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                         if (camButton) {
                             camButton->SetLabel("Close Camera");
                         }
-                        //commandResult += "Camera opened\n";
                     }
                 }
                 else if (command == "camera::close") {
@@ -967,7 +967,15 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                     if (camButton) {
                         camButton->SetLabel("Open Camera");
                     }
-                    //commandResult += "Camera closed\n";
+                }
+                else if (command.substr(0, 14) == "camera::record") {
+                    filename = "recording.avi";
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    socketClient->receiveVideoData(fullPath.ToStdString());
+                    if (!filename.empty()) {
+                        attachments.push_back(fullPath.ToStdString());
+                        commandResult += "Generated video recording\n";
+                    }
                 }
                 else if (command.substr(0, 10) == "app::start" || command.substr(0, 9) == "app::stop") {
                     commandResult += "Application control executed\n";
@@ -976,26 +984,20 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                     std::string filepath = command.substr(10);
                     size_t lastSlash = filepath.find_last_of("/\\");
                     filename = (lastSlash != std::string::npos) ? filepath.substr(lastSlash + 1) : filepath;
-                    socketClient->receiveAndSaveFile(filename);
-                    if (!filename.empty()) {
-                        wxString currentDir = wxGetCwd();
-                        wxString filePath = wxFileName(currentDir, filename).GetFullPath();
-                        attachments.push_back(filePath.ToStdString());
-                        commandResult += "Received file: " + filename + "\n";
-                    }
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    socketClient->receiveAndSaveFile(fullPath.ToStdString());
+                    attachments.push_back(fullPath.ToStdString());
+                    commandResult += "Received file: " + filename + "\n";
                 }
                 else if (command.substr(0, 12) == "file::delete") {
                     commandResult += "File deletion executed\n";
                 }
 
-                // Gửi đường dẫn lưu file về cho server nếu có file
                 if (!filename.empty()) {
-                    wxString currentDir = wxGetCwd();
-                    wxString filePath = wxFileName(currentDir, filename).GetFullPath();
-                    std::string path_command = "save_path:" + filePath.ToStdString();
+                    wxString fullPath = tempDir + wxFILE_SEP_PATH + filename;
+                    std::string path_command = "save_path:" + fullPath.ToStdString();
                     socketClient->sendData(path_command.c_str(), path_command.length());
                 }
-
             }
             catch (const std::exception& e) {
                 commandResult += "Error: " + std::string(e.what()) + "\n";
@@ -1005,7 +1007,6 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             replyMessage += commandResult;
         }
 
-        // Thêm thông tin server vào email
         replyMessage += "\nServer IP: " + ip;
         if (!attachments.empty()) {
             replyMessage += "\n\nAttached files:\n";
@@ -1016,7 +1017,6 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
             }
         }
 
-        // Gửi email với tất cả các file đính kèm
         bool success = emailHandler->sendReplyEmail(
             emailInfo.from,
             emailInfo.subject,
@@ -1027,12 +1027,15 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
 
         if (success) {
             UpdateStatus("Reply sent with " + std::to_string(attachments.size()) + " attachment(s)");
+            // Chỉ xóa file sau khi gửi mail thành công
+            for (const auto& file : attachments) {
+                wxRemoveFile(file);
+            }
         }
         else {
             UpdateStatus("Failed to send reply email");
         }
 
-        // Ngắt kết nối
         socketClient->disconnect();
         UpdateStatus("Disconnected from server: " + ip);
     }
@@ -1221,6 +1224,61 @@ void MainFrame::OnOpenCam(wxCommandEvent& event) {
         }
         isCameraOpen = false;
         UpdateStatus("Camera closed successfully");
+    }
+}
+
+void MainFrame::OnRecordCam(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    wxTextEntryDialog dialog(
+        this,
+        "Enter recording duration (seconds):",
+        "Record Video",
+        "5", 
+        wxOK | wxCANCEL | wxCENTRE
+    );
+
+    if (dialog.ShowModal() == wxID_OK) {
+        long seconds;
+        if (!dialog.GetValue().ToLong(&seconds) || seconds <= 0) {
+            wxMessageBox("Please enter a valid number of seconds", "Error",
+                wxOK | wxICON_ERROR);
+            return;
+        }
+
+        wxFileDialog saveFileDialog(this,
+            "Save Video Recording",
+            "",
+            "recording.avi",
+            "AVI files (*.avi)|*.avi",
+            wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+        if (saveFileDialog.ShowModal() == wxID_CANCEL) {
+            UpdateStatus("Operation cancelled: No save location selected");
+            return;
+        }
+
+        // Gửi command để ghi video với thời gian ghi
+        std::string command = "camera::record " + std::to_string(seconds);
+        if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
+            UpdateStatus("Failed to send record command");
+            return;
+        }
+
+        wxString filePath = saveFileDialog.GetPath();
+
+        // Nhận file video từ server và lưu với định dạng .avi
+        socketClient->receiveVideoData(filePath.ToStdString());
+
+        // Gửi đường dẫn lưu file trở lại server nếu cần
+        std::string path_command = "save_path:" + filePath.ToStdString();
+        socketClient->sendData(path_command.c_str(), path_command.length());
+
+        UpdateStatus("Video recording saved to " + filePath);
+
     }
 }
 

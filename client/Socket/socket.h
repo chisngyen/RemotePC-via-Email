@@ -22,6 +22,7 @@ public:
     int receiveData(char* buffer, int bufferSize);
     void sendCommand(const string& command);
     void receiveAndSaveFile(const string& filename);
+    void receiveVideoData(const string& filename);
     void receiveAndSaveImage(const string& filename);
     void cleanup();
     bool isConnected() const;

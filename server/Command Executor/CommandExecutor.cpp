@@ -421,84 +421,156 @@ void Command::stopApplication(const string& appName) {
 std::vector<BYTE> Command::recordVideo(int seconds) {
     std::cout << "Starting video recording..." << std::endl;
 
-    // Mở camera
-    cv::VideoCapture cap(0); // Mở camera mặc định
+    // Initialize camera
+    cv::VideoCapture cap(0);
     if (!cap.isOpened()) {
-        throw std::runtime_error("Error: Could not open the camera.");
+        throw std::runtime_error("Error: Could not open camera");
     }
 
-    // Lấy FPS và kích thước khung hình của camera
+    // Get camera properties
     double fps = cap.get(cv::CAP_PROP_FPS);
-    if (fps <= 0) fps = 30.0; // Nếu không lấy được FPS thì set mặc định là 30
+    if (fps <= 0) fps = 30.0;
     int frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
     int frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
 
-    std::cout << "Camera FPS: " << fps << std::endl;
-    std::cout << "Resolution: " << frame_width << "x" << frame_height << std::endl;
+    std::cout << "Camera settings:" << std::endl;
+    std::cout << "- FPS: " << fps << std::endl;
+    std::cout << "- Resolution: " << frame_width << "x" << frame_height << std::endl;
 
-    // Tạo file lưu video
-    cv::VideoWriter video("webcam_recording.avi",
+    // Create named window for preview
+    cv::namedWindow("Camera Preview", cv::WINDOW_AUTOSIZE);
+    // Move window to center of screen
+    cv::moveWindow("Camera Preview",
+        (GetSystemMetrics(SM_CXSCREEN) - frame_width) / 2,
+        (GetSystemMetrics(SM_CYSCREEN) - frame_height) / 2);
+
+    HWND hwnd = FindWindowA(nullptr, "Camera Preview");
+    if (!hwnd) {
+        throw std::runtime_error("Failed to find OpenCV window");
+    }
+
+    // Đặt cửa sổ luôn ở trên cùng
+    SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOPMOST);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+    // Create memory buffer to store frames
+    std::vector<cv::Mat> frames;
+    auto start_time = std::chrono::steady_clock::now();
+    int frameCount = 0;
+
+    std::cout << "Recording in progress..." << std::endl;
+
+    try {
+        while (true) {
+            cv::Mat frame;
+            cap >> frame;
+
+            if (frame.empty()) {
+                throw std::runtime_error("Failed to capture frame");
+            }
+
+            // Tính thời gian còn lại
+            auto current_time = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count();
+            int remaining_time = std::max(0, seconds - static_cast<int>(elapsed));
+
+            // Vẽ số giây đếm ngược lên khung hình
+            std::string countdown_text = "Time left: " + std::to_string(remaining_time) + "s";
+            cv::putText(frame, countdown_text, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
+
+            // Save frame and show preview
+            frames.push_back(frame.clone());
+            cv::imshow("Camera Preview", frame);
+            frameCount++;
+
+            if (frameCount % 30 == 0) {
+                std::cout << "Recording: " << elapsed << "/" << seconds << " seconds" << std::endl;
+            }
+
+            // Kiểm tra hoàn thành hoặc nhấn phím ESC để dừng
+            if (elapsed >= seconds || cv::waitKey(1) == 27) { // 27 là phím ESC
+                break;
+            }
+
+            // Cho phép UI cập nhật
+            wxYield();
+        }
+    }
+
+    catch (const std::exception& e) {
+        cap.release();
+        cv::destroyWindow("Camera Preview");
+        throw;
+    }
+
+    // Release camera and close preview
+    cap.release();
+    cv::destroyWindow("Camera Preview");
+    std::cout << "Recording completed: " << frameCount << " frames captured" << std::endl;
+
+    // Get AppData path for temporary storage
+    PWSTR appDataPath = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appDataPath))) {
+        throw std::runtime_error("Failed to get AppData path");
+    }
+
+    // Create temporary file path
+    std::wstring widePath(appDataPath);
+    std::string appDataStr(widePath.begin(), widePath.end());
+    std::string appDir = appDataStr + "\\EmailPCControl\\temp";
+    CreateDirectoryA((appDataStr + "\\EmailPCControl").c_str(), nullptr);
+    CreateDirectoryA(appDir.c_str(), nullptr);
+    std::string videoPath = appDir + "\\temp_recording.avi";
+    CoTaskMemFree(appDataPath);
+
+    // Save frames to video file
+    cv::VideoWriter video(videoPath,
         cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
         fps,
         cv::Size(frame_width, frame_height));
 
     if (!video.isOpened()) {
-        cap.release();
-        throw std::runtime_error("Error: Could not create video writer.");
+        throw std::runtime_error("Failed to create video writer");
     }
 
-    std::cout << "Recording started..." << std::endl;
-
-    auto start_time = std::chrono::steady_clock::now();
-
-    // Ghi video trong vòng thời gian yêu cầu
-    while (true) {
-        cv::Mat frame;
-        cap >> frame; // Đọc khung hình từ camera
-
-        if (frame.empty()) {
-            std::cout << "Error: Could not read frame from camera." << std::endl;
-            break;
-        }
-
-        // Ghi frame vào file video
+    for (const auto& frame : frames) {
         video.write(frame);
-
-        // Hiển thị video trực tiếp
-        cv::imshow("Recording", frame);
-
-        // Kiểm tra thời gian đã ghi
-        auto current_time = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count();
-
-        if (elapsed >= seconds || cv::waitKey(1) == 'q') { // Nếu đã đủ thời gian hoặc nhấn 'q' thì dừng
-            break;
-        }
     }
-
-    std::cout << "\nRecording finished." << std::endl;
-
-    // Giải phóng tài nguyên
-    cap.release();
     video.release();
-    cv::destroyAllWindows();
 
-    // Kiểm tra file ghi
-    std::ifstream checkFile("webcam_recording.avi", std::ios::binary | std::ios::ate);
-    if (!checkFile) {
-        throw std::runtime_error("Cannot open recorded file.");
+    // Read video file into buffer
+    std::vector<BYTE> buffer;
+    std::ifstream videoFile(videoPath, std::ios::binary | std::ios::ate);
+
+    if (!videoFile) {
+        throw std::runtime_error("Failed to read recorded video file");
     }
 
-    std::streamsize fileSize = checkFile.tellg();
-    std::cout << "Recorded file size: " << fileSize << " bytes" << std::endl;
-    checkFile.close();
+    std::streamsize videoSize = videoFile.tellg();
+    videoFile.seekg(0, std::ios::beg);
+    buffer.resize(videoSize);
 
-    // Đọc dữ liệu video vào buffer
-    std::ifstream videoFile("webcam_recording.avi", std::ios::binary);
-    std::vector<BYTE> buffer(std::istreambuf_iterator<char>(videoFile), {});
+    if (!videoFile.read(reinterpret_cast<char*>(buffer.data()), videoSize)) {
+        videoFile.close();
+        throw std::runtime_error("Error reading video data");
+    }
+
     videoFile.close();
 
-    std::cout << "Successfully read " << buffer.size() << " bytes of video data" << std::endl;
+    // Clean up temporary file
+    try {
+        if (remove(videoPath.c_str()) != 0) {
+            std::cout << "Warning: Could not delete temporary file" << std::endl;
+        }
+        else {
+            std::cout << "Successfully cleaned up temporary file" << std::endl;
+        }
+    }
+    catch (const std::exception& e) {
+        std::cout << "Warning: File cleanup failed: " << e.what() << std::endl;
+    }
 
+    std::cout << "Video processing completed. Buffer size: " << buffer.size() << " bytes" << std::endl;
     return buffer;
 }

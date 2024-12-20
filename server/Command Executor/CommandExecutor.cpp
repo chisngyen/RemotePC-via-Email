@@ -353,10 +353,12 @@ string Command::help() {
     helps += "  8. Close webcam: camera::close\n";
     helps += "  9. Start application: app::start [app_name]\n";
     helps += " 10. Stop application: app::stop [app_name]\n";
-    helps += " 11. Shut down computer: system::shutdown\n";
-    helps += " 12. Restart computer: system::restart\n";
-    helps += " 13. Lock screen: system::lock\n";
-    helps += " 14. Help: help::cmd\n";
+    helps += " 11. Start service: service::start [service_name]\n";
+    helps += " 12. Stop service: service::stop [service_name]\n";
+    helps += " 13. Shut down computer: system::shutdown\n";
+    helps += " 14. Restart computer: system::restart\n";
+    helps += " 15. Lock screen: system::lock\n";
+    helps += " 16. Help: help::cmd\n";
     return helps;
 }
 

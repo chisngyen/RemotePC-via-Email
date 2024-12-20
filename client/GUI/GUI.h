@@ -36,6 +36,7 @@ enum {
     ID_RESTART,
     ID_LOCKSCREEN,
     ID_TOGGLE_APP,
+    ID_TOGGLE_SERVICE,
     ID_LOGOUT,
     ID_RECORD_CAM = wxID_HIGHEST + 100
 };
@@ -113,6 +114,7 @@ public:
                 else if (cmd == "Restart") commandId = ID_RESTART;
                 else if (cmd == "Lock Screen") commandId = ID_LOCKSCREEN;
                 else if (cmd == "Application Control") commandId = ID_TOGGLE_APP;
+                else if (cmd == "Service Control") commandId = ID_TOGGLE_SERVICE;
                 else if (cmd == "Help") commandId = ID_HELP;
 
                 if (commandId != -1) {
@@ -183,8 +185,10 @@ private:
 
     // State variables
     bool isMonitoring;
+    bool isServiceRunning;
     bool isAppRunning;
     bool isCameraOpen;
+    wxString currentServiceName;
     DWORD currentProcessId;
     wxString currentAppName;
     wxString userGmail;
@@ -220,6 +224,7 @@ private:
     void OnShutdown(wxCommandEvent& event);
     void OnRestart(wxCommandEvent& event);
     void OnLockScreen(wxCommandEvent& event);
+    void OnToggleService(wxCommandEvent& event);
     void OnToggleApp(wxCommandEvent& event);
     void OnOAuthCode(wxCommandEvent& event);
 

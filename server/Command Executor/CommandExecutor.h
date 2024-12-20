@@ -85,5 +85,8 @@ public:
     void startApplication(const string& appName);
     void stopApplication(const string& appName);
 
+    //Start/Stop service
+    void startService(const string& serviceName);
+    void stopService(const string& serviceName);
 };
 

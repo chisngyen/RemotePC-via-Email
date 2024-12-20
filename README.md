@@ -28,6 +28,7 @@ vcpkg integrate install
 vcpkg install wxwidgets:x64-windows
 vcpkg install curl:x64-windows
 vcpkg install jsoncpp:x64-windows
+vcpkg install opencv:x64-windows
 ```
 
 ## Cấu Hình Project
@@ -65,14 +66,16 @@ git clone https://github.com/chisngyen/RemotePC-via-Email.git
    - Click "Connect"
 
 4. Các lệnh có sẵn:
-   - List::app - Liệt kê ứng dụng đang chạy
-   - List::process - Liệt kê processes
-   - List::service - Liệt kê services
-   - Screenshot::capture - Chụp màn hình
-   - Camera::open/close - Điều khiển webcam
-   - System::shutdown/restart/lock - Điều khiển hệ thống
+   - list::app - Liệt kê ứng dụng đang chạy
+   - list::process - Liệt kê processes
+   - list::service - Liệt kê services
+   - screenshot::capture - Chụp màn hình
+   - camera::open/close - Điều khiển webcam
+   - system::shutdown/restart/lock - Điều khiển hệ thống
    - file::get/delete - Lấy và xóa file
-   - App::start/stop - Khởi động/dừng ứng dụng
+   - app::start/stop - Khởi động/dừng ứng dụng
+   - service::start/stop - Khởi động/dừng dịch vụ
+   - help::cmd - Liệt kê các câu lệnh
 
 ## Gửi Email Điều Khiển
 

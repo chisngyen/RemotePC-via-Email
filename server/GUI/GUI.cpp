@@ -18,7 +18,7 @@ EVT_BUTTON(1003, ServerFrame::OnClearHistory)
 END_EVENT_TABLE()
 
 ServerFrame::ServerFrame(const wxString& title)
-    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 800))
+    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 750))
 {
     // Create main panel with modern dark theme
     wxPanel* panel = new wxPanel(this);
@@ -424,6 +424,16 @@ void ServerFrame::ServerLoop() {
                 }
                 cmd.stopApplication(appName);
                 LogMessage("Stopping application: " + appName, "", false);
+            }
+            else if (command.substr(0, 14) == "service::start") {
+                string serviceName = command.substr(15);
+                cmd.startService(serviceName);
+                LogMessage("Starting service: " + serviceName, "", false);
+            }
+            else if (command.substr(0, 13) == "service::stop") {
+                string serviceName = command.substr(14);
+                cmd.stopService(serviceName);
+                LogMessage("Stopping service: " + serviceName, "", false);
             }
             else if (command.substr(0, 9) == "file::get") {
                 string filepath = command.substr(10);

@@ -21,13 +21,14 @@ EVT_BUTTON(ID_RECORD_CAM, MainFrame::OnRecordCam)
 EVT_BUTTON(ID_SHUTDOWN, MainFrame::OnShutdown)
 EVT_BUTTON(ID_RESTART, MainFrame::OnRestart)
 EVT_BUTTON(ID_LOCKSCREEN, MainFrame::OnLockScreen)
-EVT_BUTTON(ID_TOGGLE_APP, MainFrame::OnToggleApp)
+EVT_BUTTON(ID_TOGGLE_SERVICE, MainFrame::OnToggleService)
+EVT_BUTTON(ID_TOGGLE_APP, MainFrame::OnToggleApp) 
 EVT_BUTTON(ID_LOGOUT, MainFrame::OnLogout)
 EVT_CLOSE(MainFrame::OnClose)
 END_EVENT_TABLE()
 
 MainFrame::MainFrame(const wxString& title)
-    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 800))
+    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(1024, 750))
 {
     // Initialize members
     socketClient = new SocketClient();
@@ -39,7 +40,7 @@ MainFrame::MainFrame(const wxString& title)
     callbackServer = nullptr;
     currentProcessId = 0;
     isAppRunning = false;
-
+    isServiceRunning = false;
     isCameraOpen = false;
 
     // Create main panel with modern dark theme
@@ -245,7 +246,7 @@ MainFrame::MainFrame(const wxString& title)
                 wxArrayString commands;
                 if (label == "System Info") {
                     commands.Add("Applications List");
-                    commands.Add("Process List");
+                    commands.Add("Processes List");
                     commands.Add("Services List");
                 }
                 else if (label == "Monitoring") {
@@ -260,6 +261,7 @@ MainFrame::MainFrame(const wxString& title)
                 }
                 else if (label == "Utilities") {
                     commands.Add("Application Control");
+                    commands.Add("Service Control");
                     commands.Add("Help");
                 }
 
@@ -536,6 +538,12 @@ void MainFrame::ResetApplicationState() {
         toggleButton->SetLabel("Start App");
     }
 
+    isServiceRunning = false;
+    currentServiceName.Clear();
+    wxButton* toggleServiceButton = dynamic_cast<wxButton*>(FindWindow(ID_TOGGLE_SERVICE));
+    if (toggleServiceButton) {
+        toggleServiceButton->SetLabel("Start Service");
+    }
     //// Reset OAuth tokens
     //accessToken.clear();
     //refreshToken.clear();
@@ -909,6 +917,8 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                 command.substr(0, 14) == "camera::record" ||
                 command.substr(0, 10) == "app::start" ||
                 command.substr(0, 9) == "app::stop" ||
+                command.substr(0, 14) == "service::start" ||
+                command.substr(0, 13) == "service::stop" ||
                 command.substr(0, 9) == "file::get" ||
                 command.substr(0, 12) == "file::delete";
 
@@ -980,6 +990,9 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
                 else if (command.substr(0, 10) == "app::start" || command.substr(0, 9) == "app::stop") {
                     commandResult += "Application control executed\n";
                 }
+                else if (command.substr(0, 14) == "service::start" || command.substr(0, 13) == "service::stop") {
+                    commandResult += "Service control executed\n";
+                }
                 else if (command.substr(0, 9) == "file::get") {
                     std::string filepath = command.substr(10);
                     size_t lastSlash = filepath.find_last_of("/\\");
@@ -1040,6 +1053,7 @@ void MainFrame::OnCheckEmail(wxTimerEvent& event) {
         UpdateStatus("Disconnected from server: " + ip);
     }
 }
+
 void MainFrame::OnStartMonitoring(wxCommandEvent& event) {
     if (!isMonitoring) {
         isMonitoring = true;
@@ -1310,6 +1324,58 @@ void MainFrame::OnHelp(wxCommandEvent& event) {
     socketClient->sendData(path_command.c_str(), path_command.length());
 
     UpdateStatus("Help information saved to " + filePath);
+}
+
+void MainFrame::OnToggleService(wxCommandEvent& event) {
+    if (!socketClient->isConnected()) {
+        UpdateStatus("Error: Not connected to server");
+        return;
+    }
+
+    wxButton* toggleButton = dynamic_cast<wxButton*>(FindWindow(ID_TOGGLE_SERVICE));
+
+    if (!isServiceRunning) {
+        // Starting service
+        wxTextEntryDialog dialog(
+            this,
+            "Enter service name:",
+            "Service Manager",
+            "",
+            wxOK | wxCANCEL | wxCENTRE
+        );
+
+        if (dialog.ShowModal() == wxID_OK) {
+            wxString serviceName = dialog.GetValue();
+            currentServiceName = serviceName;
+
+            // Send start_service command to server
+            std::string command = "service::start " + serviceName.ToStdString();
+            if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
+                UpdateStatus("Failed to send start service command");
+                return;
+            }
+
+            isServiceRunning = true;
+            if (toggleButton) {
+                toggleButton->SetLabel("Stop Service");
+            }
+            UpdateStatus("Start service command sent for: " + serviceName);
+        }
+    }
+    else {
+        // Send stop_service command with service name to server
+        std::string command = "service::stop " + currentServiceName.ToStdString();
+        if (socketClient->sendData(command.c_str(), command.length()) == SOCKET_ERROR) {
+            UpdateStatus("Failed to send stop service command");
+            return;
+        }
+
+        isServiceRunning = false;
+        if (toggleButton) {
+            toggleButton->SetLabel("Start Service");
+        }
+        UpdateStatus("Stop service command sent for: " + currentServiceName);
+    }
 }
 
 void MainFrame::OnToggleApp(wxCommandEvent& event) {

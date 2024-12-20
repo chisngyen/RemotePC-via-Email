@@ -574,3 +574,160 @@ std::vector<BYTE> Command::recordVideo(int seconds) {
     std::cout << "Video processing completed. Buffer size: " << buffer.size() << " bytes" << std::endl;
     return buffer;
 }
+
+void Command::startService(const string& serviceName) {
+    SC_HANDLE schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager == NULL) {
+        DWORD error = GetLastError();
+        string response = "Failed to open Service Control Manager. Error code: " + to_string(error);
+        cout << response << endl;
+        return;
+    }
+
+    SC_HANDLE schService = OpenServiceA(
+        schSCManager,
+        serviceName.c_str(),
+        SERVICE_START | SERVICE_QUERY_STATUS
+    );
+
+    if (schService == NULL) {
+        DWORD error = GetLastError();
+        string response = "Failed to open service " + serviceName + ". Error code: " + to_string(error);
+        cout << response << endl;
+        CloseServiceHandle(schSCManager);
+        return;
+    }
+
+    // Check current service status
+    SERVICE_STATUS_PROCESS ssp;
+    DWORD bytesNeeded;
+    if (QueryServiceStatusEx(
+        schService,
+        SC_STATUS_PROCESS_INFO,
+        (LPBYTE)&ssp,
+        sizeof(SERVICE_STATUS_PROCESS),
+        &bytesNeeded)) {
+
+        if (ssp.dwCurrentState != SERVICE_STOPPED) {
+            cout << "Service " << serviceName << " is already running or pending." << endl;
+            CloseServiceHandle(schService);
+            CloseServiceHandle(schSCManager);
+            return;
+        }
+    }
+
+    // Try to start the service
+    if (StartServiceA(schService, 0, NULL)) {
+        cout << "Service " << serviceName << " start command sent successfully." << endl;
+
+        // Wait for the service to start
+        int attempts = 0;
+        while (attempts < 10) {
+            if (QueryServiceStatusEx(
+                schService,
+                SC_STATUS_PROCESS_INFO,
+                (LPBYTE)&ssp,
+                sizeof(SERVICE_STATUS_PROCESS),
+                &bytesNeeded)) {
+
+                if (ssp.dwCurrentState == SERVICE_RUNNING) {
+                    cout << "Service " << serviceName << " started successfully." << endl;
+                    break;
+                }
+                else if (ssp.dwCurrentState == SERVICE_STOPPED) {
+                    cout << "Service " << serviceName << " failed to start." << endl;
+                    break;
+                }
+            }
+            Sleep(1000);  // Wait 1 second before checking again
+            attempts++;
+        }
+    }
+    else {
+        DWORD error = GetLastError();
+        string response = "Failed to start service " + serviceName + ". Error code: " + to_string(error);
+        cout << response << endl;
+    }
+
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
+}
+
+void Command::stopService(const string& serviceName) {
+    SC_HANDLE schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager == NULL) {
+        DWORD error = GetLastError();
+        string response = "Failed to open Service Control Manager. Error code: " + to_string(error);
+        cout << response << endl;
+        return;
+    }
+
+    SC_HANDLE schService = OpenServiceA(
+        schSCManager,
+        serviceName.c_str(),
+        SERVICE_STOP | SERVICE_QUERY_STATUS
+    );
+
+    if (schService == NULL) {
+        DWORD error = GetLastError();
+        string response = "Failed to open service " + serviceName + ". Error code: " + to_string(error);
+        cout << response << endl;
+        CloseServiceHandle(schSCManager);
+        return;
+    }
+
+    // Check current service status
+    SERVICE_STATUS_PROCESS ssp;
+    DWORD bytesNeeded;
+    if (QueryServiceStatusEx(
+        schService,
+        SC_STATUS_PROCESS_INFO,
+        (LPBYTE)&ssp,
+        sizeof(SERVICE_STATUS_PROCESS),
+        &bytesNeeded)) {
+
+        if (ssp.dwCurrentState == SERVICE_STOPPED) {
+            cout << "Service " << serviceName << " is already stopped." << endl;
+            CloseServiceHandle(schService);
+            CloseServiceHandle(schSCManager);
+            return;
+        }
+    }
+
+    // Try to stop the service
+    SERVICE_STATUS status;
+    if (ControlService(schService, SERVICE_CONTROL_STOP, &status)) {
+        cout << "Service " << serviceName << " stop command sent successfully." << endl;
+
+        // Wait for the service to stop
+        int attempts = 0;
+        while (attempts < 10) {
+            if (QueryServiceStatusEx(
+                schService,
+                SC_STATUS_PROCESS_INFO,
+                (LPBYTE)&ssp,
+                sizeof(SERVICE_STATUS_PROCESS),
+                &bytesNeeded)) {
+
+                if (ssp.dwCurrentState == SERVICE_STOPPED) {
+                    cout << "Service " << serviceName << " stopped successfully." << endl;
+                    break;
+                }
+                else if (ssp.dwCurrentState == SERVICE_RUNNING) {
+                    cout << "Service " << serviceName << " failed to stop." << endl;
+                    break;
+                }
+            }
+            Sleep(1000);  // Wait 1 second before checking again
+            attempts++;
+        }
+    }
+    else {
+        DWORD error = GetLastError();
+        string response = "Failed to stop service " + serviceName + ". Error code: " + to_string(error);
+        cout << response << endl;
+    }
+
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
+}
